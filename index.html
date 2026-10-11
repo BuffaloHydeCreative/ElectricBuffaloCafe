@@ -11,55 +11,38 @@
       background: transparent; 
       color: #fff; 
       font-family: 'Courier New', Courier, monospace; 
-      display: flex; flex-direction: column; 
       height: 100vh; overflow: hidden;
     }
 
-    /* Header / Marquee */
-    .marquee {
-      text-align: center;
-      padding: 15px 10px;
-      background: rgba(15, 15, 15, 0.95);
-      letter-spacing: 2px;
-      font-weight: bold;
-      font-size: 20px;
-    }
-
-    /* Red & Yellow Accent Lines */
-    .theme-lines {
-      width: 100%;
-    }
-    .line-red { height: 4px; background-color: #e60000; }
-    .line-yellow { height: 4px; background-color: #ffcc00; }
-
-    /* SNES-Style Icon Scroller */
-    .scroller-container {
-      padding: 20px 10px;
-      background: rgba(25, 25, 25, 0.85);
-      z-index: 10;
-    }
-    
-    .scroller-wrapper {
+    /* Main Arcade Layout */
+    .arcade-machine {
       display: flex;
-      justify-content: center;
-      width: 100%;
+      flex-direction: row;
+      max-width: 800px;
+      margin: 0 auto;
+      height: 100%;
+      background: rgba(10, 10, 10, 0.85);
+      border-radius: 12px;
+      padding: 15px;
+      box-sizing: border-box;
     }
 
-    .scroller {
-      display: flex; 
-      gap: 12px; 
-      overflow-x: auto; 
-      padding-bottom: 5px;
-      scroll-snap-type: x mandatory;
-      scrollbar-width: none; /* Hides scrollbar for a cleaner look */
-      max-width: 100%;
+    /* Left Side: Vertical Game Selector */
+    .scroller-container {
+      width: 150px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-right: 15px;
+      overflow-y: auto;
+      scrollbar-width: none;
     }
-    .scroller::-webkit-scrollbar { display: none; }
+    .scroller-container::-webkit-scrollbar { display: none; }
 
     /* Text-Only Game Cards */
     .game-card {
-      flex: 0 0 120px; 
-      height: 45px;
+      height: 60px;
       background: #111; 
       border: 2px solid #444; 
       border-radius: 6px;
@@ -68,11 +51,11 @@
       justify-content: center;
       cursor: pointer; 
       transition: all 0.2s ease-in-out;
-      scroll-snap-align: center;
       color: #aaa;
       text-transform: uppercase;
       font-size: 14px;
       font-weight: bold;
+      text-align: center;
     }
 
     /* Active & Hover States */
@@ -80,29 +63,53 @@
       transform: scale(1.05);
       border-color: #ffcc00;
       color: #fff;
-      background: #e60000;
-      box-shadow: 0 4px 10px rgba(230, 0, 0, 0.4);
+      background: #222;
+      box-shadow: 0 0 10px rgba(255, 204, 0, 0.4);
     }
 
-    /* The CRT Screen Container */
+    /* Center: Neon Tubing (Red & Yellow) */
+    .neon-tubes {
+      display: flex;
+      gap: 8px;
+      padding: 0 15px;
+      flex-shrink: 0;
+    }
+
+    .tube-red {
+      width: 4px;
+      height: 100%;
+      background: #ff9999;
+      border-radius: 4px;
+      box-shadow: 0 0 10px #e60000, 0 0 20px #e60000, 0 0 30px #e60000;
+    }
+
+    .tube-yellow {
+      width: 4px;
+      height: 100%;
+      background: #ffff99;
+      border-radius: 4px;
+      box-shadow: 0 0 10px #ffcc00, 0 0 20px #ffcc00, 0 0 30px #ffcc00;
+    }
+
+    /* Right Side: The CRT Screen */
     .screen-wrapper {
       flex: 1;
       position: relative;
-      padding: 20px;
       display: flex;
       justify-content: center;
       align-items: center;
+      min-width: 0; /* Prevents flex overflow */
     }
 
     .crt-monitor {
       width: 100%;
       max-width: 500px;
-      aspect-ratio: 3/4; /* Matches your mini-game dimensions */
+      aspect-ratio: 3/4;
       max-height: 100%;
       position: relative;
       border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
       border: 12px solid #222;
       background: #000;
     }
@@ -114,7 +121,7 @@
       display: block;
     }
 
-    /* CRT Scanline Overlay (Isolated strictly to the monitor) */
+    /* CRT Scanline Overlay */
     .crt-monitor::after {
       content: " ";
       display: block;
@@ -123,82 +130,75 @@
       background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
       z-index: 2;
       background-size: 100% 3px, 3px 100%;
-      pointer-events: none; /* Allows clicks to pass through to the iframe */
+      pointer-events: none;
       box-shadow: inset 0 0 50px rgba(0,0,0,0.9);
+    }
+
+    /* Mobile Responsiveness: Stack Vertically on Small Screens */
+    @media (max-width: 600px) {
+      .arcade-machine {
+        flex-direction: column;
+        padding: 10px;
+      }
+      .scroller-container {
+        width: 100%;
+        flex-direction: row;
+        overflow-x: auto;
+        padding-right: 0;
+        padding-bottom: 10px;
+      }
+      .game-card {
+        flex: 0 0 120px;
+        height: 45px;
+      }
+      .neon-tubes {
+        flex-direction: column;
+        padding: 10px 0;
+        height: 20px;
+      }
+      .tube-red, .tube-yellow {
+        width: 100%;
+        height: 4px;
+      }
     }
   </style>
 </head>
 <body>
 
-  <div class="marquee">INSERT COIN // SELECT GAME</div>
-  
-  <div class="theme-lines">
-    <div class="line-red"></div>
-    <div class="line-yellow"></div>
-  </div>
+  <div class="arcade-machine">
+    
+    <!-- Left: Vertical Game Menu -->
+    <div class="scroller-container">
+      <div class="game-card active" onclick="loadGame('game1.html', this)"><div>Game 1</div></div>
+      <div class="game-card" onclick="loadGame('game2.html', this)"><div>Game 2</div></div>
+      <div class="game-card" onclick="loadGame('game3.html', this)"><div>Game 3</div></div>
+      <div class="game-card" onclick="loadGame('game4.html', this)"><div>Game 4</div></div>
+      <div class="game-card" onclick="loadGame('game5.html', this)"><div>Game 5</div></div>
+      <div class="game-card" onclick="loadGame('game6.html', this)"><div>Game 6</div></div>
+      <div class="game-card" onclick="loadGame('game7.html', this)"><div>Game 7</div></div>
+    </div>
 
-  <div class="scroller-container">
-    <div class="scroller-wrapper">
-      <div class="scroller" id="game-menu">
-        
-        <!-- Game 1 -->
-        <div class="game-card active" onclick="loadGame('game1.html', this)">
-          <div>Game 1</div>
-        </div>
-        
-        <!-- Game 2 -->
-        <div class="game-card" onclick="loadGame('game2.html', this)">
-          <div>Game 2</div>
-        </div>
-        
-        <!-- Game 3 -->
-        <div class="game-card" onclick="loadGame('game3.html', this)">
-          <div>Game 3</div>
-        </div>
-        
-        <!-- Game 4 -->
-        <div class="game-card" onclick="loadGame('game4.html', this)">
-          <div>Game 4</div>
-        </div>
-        
-        <!-- Game 5 -->
-        <div class="game-card" onclick="loadGame('game5.html', this)">
-          <div>Game 5</div>
-        </div>
-        
-        <!-- Game 6 -->
-        <div class="game-card" onclick="loadGame('game6.html', this)">
-          <div>Game 6</div>
-        </div>
-        
-        <!-- Game 7 -->
-        <div class="game-card" onclick="loadGame('game7.html', this)">
-          <div>Game 7</div>
-        </div>
+    <!-- Center: Glowing Neon Arcade Tubing -->
+    <div class="neon-tubes">
+      <div class="tube-red"></div>
+      <div class="tube-yellow"></div>
+    </div>
 
+    <!-- Right: CRT Monitor -->
+    <div class="screen-wrapper">
+      <div class="crt-monitor">
+        <iframe id="arcade-screen" src="game1.html" title="Arcade Screen"></iframe>
       </div>
     </div>
-  </div>
 
-  <div class="screen-wrapper">
-    <div class="crt-monitor">
-      <iframe id="arcade-screen" src="game1.html" title="Arcade Screen"></iframe>
-    </div>
   </div>
 
   <script>
     function loadGame(url, cardElement) {
-      // 1. Change the iframe source
       document.getElementById('arcade-screen').src = url;
-      
-      // 2. Remove 'active' class from all cards
       const cards = document.querySelectorAll('.game-card');
       cards.forEach(card => card.classList.remove('active'));
-      
-      // 3. Add 'active' class to the clicked card
       cardElement.classList.add('active');
-      
-      // 4. Smooth scroll the menu so the selected game is centered
       cardElement.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
   </script>
