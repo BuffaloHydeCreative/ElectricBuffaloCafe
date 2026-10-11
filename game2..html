@@ -4,73 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Learn to Jig</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body {
             margin: 0;
             padding: 0;
-            background-color: #540E11; /* Night Bordeaux */
+            background-color: transparent;
             color: #ffffff;
             font-family: 'Press Start 2P', cursive;
             overflow: hidden;
             touch-action: none;
-        }
-        #game-container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
+            height: 100vh;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+            max-width: 600px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+            padding: 10px;
         }
         canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
             image-rendering: pixelated;
             background-color: #540E11; /* Night Bordeaux */
             border: 4px solid #FB6604; /* Blaze Orange */
             border-radius: 8px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            max-width: 100%;
-            max-height: 100%;
-        }
-        .ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-        }
-        .screen {
-            background: rgba(84, 14, 17, 0.95); /* Night Bordeaux with opacity */
-            padding: 2rem;
-            border: 4px solid #12AEA2; /* Light Sea Green */
-            border-radius: 12px;
-            pointer-events: auto;
-            max-width: 90%;
-        }
-        .btn {
-            background-color: #AD1C21; /* Brick Red */
-            color: white;
-            border: 4px solid #FB6604; /* Blaze Orange */
-            padding: 15px 30px;
-            font-family: 'Press Start 2P', cursive;
-            font-size: 16px;
-            cursor: pointer;
-            margin-top: 20px;
-            text-transform: uppercase;
-            transition: transform 0.1s;
-        }
-        .btn:active {
-            transform: scale(0.95);
-        }
-        .hidden {
-            display: none !important;
+            aspect-ratio: 3 / 2;
         }
     </style>
 </head>
@@ -78,35 +46,11 @@
 
     <div id="game-container">
         <canvas id="gameCanvas" width="600" height="400"></canvas>
-
-        <div id="ui-layer" class="ui-layer">
-            <div id="start-screen" class="screen">
-                <h1 class="text-2xl mb-4 leading-relaxed" style="color: #FB6604;">Learn<br>to Jig</h1>
-                <p class="text-xs leading-loose mb-6" style="color: #12AEA2;">
-                    Watch the track!<br><br>
-                    Tap/Space when the<br>
-                    notes hit the target.<br><br>
-                    Keep the rhythm to Jig!
-                </p>
-                <button id="start-btn" class="btn">Play</button>
-            </div>
-
-            <div id="game-over-screen" class="screen hidden">
-                <h1 class="text-2xl mb-4" style="color: #FB6604;">You Stumbled!</h1>
-                <p class="text-sm mb-2" style="color: white;">Score: <span id="final-score">0</span></p>
-                <p class="text-sm mb-6" style="color: white;">Max Combo: <span id="max-combo">0</span></p>
-                <button id="restart-btn" class="btn">Try Again</button>
-            </div>
-        </div>
     </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const startScreen = document.getElementById('start-screen');
-        const gameOverScreen = document.getElementById('game-over-screen');
-        const startBtn = document.getElementById('start-btn');
-        const restartBtn = document.getElementById('restart-btn');
 
         const BPM = 130;
         const STEP_INTERVAL = (60.0 / BPM) / 2;
@@ -243,18 +187,18 @@
         function scheduler() {
             if (gameState !== 'PLAYING') return;
             while (nextStepTime < audioCtx.currentTime + SCHEDULE_AHEAD_TIME) {
-                const stepData = melodyPattern[currentStep % melodyPattern.length];
-                if (stepData.n) playFiddleNote(stepData.n, nextStepTime, STEP_INTERVAL * 0.9);
-                if (stepData.t) expectedBeats.push({ time: nextStepTime, hit: false, missed: false });
+                if (currentStep < melodyPattern.length) {
+                    const stepData = melodyPattern[currentStep];
+                    if (stepData.n) playFiddleNote(stepData.n, nextStepTime, STEP_INTERVAL * 0.9);
+                    if (stepData.t) expectedBeats.push({ time: nextStepTime, hit: false, missed: false });
+                }
                 nextStepTime += STEP_INTERVAL;
                 currentStep++;
             }
             timerID = setTimeout(scheduler, LOOKAHEAD);
         }
 
-        function handleInput(e) {
-            if(e && e.type === 'keydown' && e.code !== 'Space') return;
-            if(e) e.preventDefault();
+        function handleInput() {
             if (gameState !== 'PLAYING' || jiggerState === 'FALL') return;
 
             const now = audioCtx.currentTime;
@@ -297,32 +241,39 @@
             floatingTexts.push({ text: text, color: color, y: canvas.height / 2 - 50, x: canvas.width / 2 + 50, alpha: 1.0, life: 1.0 });
         }
 
-        window.addEventListener('keydown', handleInput);
-        canvas.addEventListener('mousedown', handleInput);
-        canvas.addEventListener('touchstart', handleInput, {passive: false});
-        startBtn.addEventListener('click', startGame);
-        restartBtn.addEventListener('click', startGame);
+        // --- Arcade Cabinet Bridge ---
+        window.addEventListener('message', function(event) {
+            if (event.data === 'BUTTON_A') {
+                if (gameState === 'START' || gameState === 'GAME_OVER') {
+                    startGame();
+                } else if (gameState === 'PLAYING') {
+                    handleInput();
+                }
+            }
+        });
 
         function startGame() {
             initAudio();
             if(audioCtx.state === 'suspended') audioCtx.resume();
-            startScreen.classList.add('hidden');
-            gameOverScreen.classList.add('hidden');
             score = 0; combo = 0; expectedBeats = [];
             gameState = 'PLAYING'; jiggerState = 'IDLE';
-            nextStepTime = audioCtx.currentTime + 3.0;
-            currentStep = 0; scheduler();
-            requestAnimationFrame(gameLoop);
+            nextStepTime = audioCtx.currentTime + 1.0;
+            currentStep = 0; 
+            scheduler();
         }
 
         function gameLoop() {
-            if (gameState !== 'PLAYING') return;
-            updateState(); draw();
+            updateState(); 
+            draw();
             requestAnimationFrame(gameLoop);
         }
 
         function updateState() {
+            if (gameState !== 'PLAYING') return;
+
             const now = audioCtx.currentTime;
+            
+            // Check for missed beats
             for (let i = expectedBeats.length - 1; i >= 0; i--) {
                 let b = expectedBeats[i];
                 if (!b.hit && !b.missed && now > b.time + TOLERANCE_GOOD) {
@@ -331,7 +282,14 @@
                 }
                 if ((b.hit || b.missed) && now > b.time + 1.0) expectedBeats.splice(i, 1);
             }
+
+            // End of song condition
+            if (currentStep >= melodyPattern.length && expectedBeats.length === 0 && now > nextStepTime + 1.0) {
+                gameState = 'GAME_OVER';
+            }
+
             if (jiggerTimer > 0 && now >= jiggerTimer) { jiggerState = 'IDLE'; jiggerTimer = 0; }
+            
             for (let i = floatingTexts.length - 1; i >= 0; i--) {
                 let ft = floatingTexts[i];
                 ft.y -= 1; ft.life -= 0.016; ft.alpha = ft.life;
@@ -360,21 +318,55 @@
             ctx.fillStyle = '#0F6F9E'; // Cornflower track background
             ctx.fillRect(0, canvas.height - 80, canvas.width, 80);
 
+            // Menu Overlay - Start Screen
+            if (gameState === 'START') {
+                ctx.fillStyle = '#FB6604';
+                ctx.font = '36px "Press Start 2P"';
+                ctx.textAlign = 'center';
+                ctx.fillText("Learn to Jig", canvas.width/2, canvas.height/2 - 40);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '14px "Press Start 2P"';
+                ctx.fillText("PRESS 'A' TO PLAY", canvas.width/2, canvas.height/2 + 20);
+                return;
+            }
+
+            // Menu Overlay - Game Over
+            if (gameState === 'GAME_OVER') {
+                ctx.fillStyle = '#FB6604';
+                ctx.font = '36px "Press Start 2P"';
+                ctx.textAlign = 'center';
+                ctx.fillText("FINISHED!", canvas.width/2, canvas.height/2 - 60);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '16px "Press Start 2P"';
+                ctx.fillText(`Final Score: ${score}`, canvas.width/2, canvas.height/2);
+                ctx.fillText(`Max Combo: ${maxCombo}`, canvas.width/2, canvas.height/2 + 30);
+                
+                ctx.fillStyle = '#12AEA2';
+                ctx.font = '14px "Press Start 2P"';
+                ctx.fillText("PRESS 'A' TO REPLAY", canvas.width/2, canvas.height/2 + 80);
+                return;
+            }
+
+            // Gameplay Drawing
             if (gameState === 'PLAYING') {
                 ctx.strokeStyle = '#FB6604'; // Blaze Orange Hit Zone
                 ctx.lineWidth = 4;
                 ctx.strokeRect(HIT_ZONE_X - 15, canvas.height - 75, 30, 70);
 
-                const now = audioCtx.currentTime;
-                for (let i = 0; i < expectedBeats.length; i++) {
-                    let b = expectedBeats[i];
-                    if (!b.hit && !b.missed) {
-                        let x = HIT_ZONE_X + (b.time - now) * NOTE_SPEED;
-                        if (x > -50 && x < canvas.width + 50) {
-                            ctx.fillStyle = '#AD1C21'; // Brick Red note
-                            ctx.fillRect(x - 10, canvas.height - 70, 20, 60);
-                            ctx.fillStyle = '#FB6604'; // Blaze Orange detail
-                            ctx.fillRect(x - 5, canvas.height - 65, 10, 50);
+                if (audioCtx) {
+                    const now = audioCtx.currentTime;
+                    for (let i = 0; i < expectedBeats.length; i++) {
+                        let b = expectedBeats[i];
+                        if (!b.hit && !b.missed) {
+                            let x = HIT_ZONE_X + (b.time - now) * NOTE_SPEED;
+                            if (x > -50 && x < canvas.width + 50) {
+                                ctx.fillStyle = '#AD1C21'; // Brick Red note
+                                ctx.fillRect(x - 10, canvas.height - 70, 20, 60);
+                                ctx.fillStyle = '#FB6604'; // Blaze Orange detail
+                                ctx.fillRect(x - 5, canvas.height - 65, 10, 50);
+                            }
                         }
                     }
                 }
@@ -384,6 +376,7 @@
             if (jiggerState === 'JIG_L') jiggerSprite = SPRITES.JIGGER_L;
             else if (jiggerState === 'JIG_R') jiggerSprite = SPRITES.JIGGER_R;
             else if (jiggerState === 'FALL') jiggerSprite = SPRITES.JIGGER_FALL;
+            
             drawSprite(jiggerSprite, canvas.width / 2 - 48, canvas.height - 230, 8);
 
             ctx.fillStyle = '#ffffff';
@@ -397,7 +390,7 @@
             ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
             ctx.font = '10px "Press Start 2P"';
             ctx.textAlign = 'center';
-            ctx.fillText("TAP / SPACE on the beat!", canvas.width/2, canvas.height - 90);
+            ctx.fillText("PRESS 'A' ON THE BEAT!", canvas.width/2, canvas.height - 90);
 
             for (let ft of floatingTexts) {
                 ctx.fillStyle = ft.color;
@@ -412,7 +405,8 @@
             }
         }
 
-        draw();
+        // Initialize the loop
+        requestAnimationFrame(gameLoop);
     </script>
 </body>
 </html>
