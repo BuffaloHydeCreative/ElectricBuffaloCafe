@@ -1,9 +1,373 @@
-<div style="position: relative; width: 100%; max-width: 500px; margin: 0 auto; height: 75vh; min-height: 650px; max-height: 800px;">
-  <iframe 
-    src="REPLACE_WITH_YOUR_URL_HERE.html" 
-    title="Miskwa-Kamaw Sipiy Game"
-    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; border-radius: 12px; overflow: hidden;" 
-    scrolling="no"
-    allowfullscreen>
-  </iframe>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Miskwa-Kamaw Sipiy</title>
+<style>
+  body {
+    margin: 0; padding: 0;
+    background: transparent;
+    display: flex; justify-content: center; align-items: center;
+    height: 100vh; width: 100vw;
+    font-family: 'Courier New', Courier, monospace;
+    user-select: none; touch-action: manipulation; overflow: hidden;
+  }
+  #game-container {
+    width: 100%; height: 100%; max-width: 500px;
+    display: flex; flex-direction: column; justify-content: center;
+    box-sizing: border-box; padding: 10px;
+    background: transparent; 
+  }
+  #header {
+    flex: 0 0 auto; display: flex; justify-content: space-between;
+    color: #F7C844; font-weight: bold; margin-bottom: 10px;
+    border-bottom: 2px solid #3D5948; padding-bottom: 5px;
+    font-size: 14px; text-transform: uppercase;
+  }
+  #screen-container {
+    flex: 0 0 auto; width: 100%;
+    aspect-ratio: 2 / 1; 
+    border: 4px solid #D4D0C5; 
+    position: relative; background: transparent;
+    overflow: hidden; box-sizing: border-box;
+  }
+  canvas {
+    width: 100%; height: 100%;
+    display: block; image-rendering: pixelated;
+  }
+  #msg {
+    position: absolute; top: 40%; left: 50%; transform: translateX(-50%);
+    font-weight: bold; color: #ffffff; background: #0E2A1E; 
+    font-size: 14px; padding: 6px 12px; display: none; white-space: nowrap;
+    border: 2px solid #F7C844; text-align: center;
+  }
+  #controls {
+    flex: 0 0 auto; display: flex; justify-content: space-between;
+    margin-top: 15px; gap: 10px;
+  }
+  .arcade-btn {
+    flex: 1; padding: 25px 0;
+    background: #540E11; color: #F7C844;
+    border: 4px solid #D4D0C5; border-radius: 8px;
+    font-family: inherit; font-weight: 900; font-size: 18px;
+    cursor: pointer; touch-action: manipulation;
+    text-transform: uppercase; box-shadow: 0 6px 0 #3D5948;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .arcade-btn:active {
+    transform: translateY(6px); box-shadow: 0 0px 0 #3D5948; background: #3a080a;
+  }
+  .arcade-btn.disabled {
+    opacity: 0.5; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div id="header">
+    <span>MISKWA-KAMAW SIPIY</span>
+    <span id="score-display">DIST: 0</span>
+  </div>
+  
+  <div id="screen-container">
+    <canvas id="gameCanvas" width="160" height="80"></canvas>
+    <div id="msg">TAP TO START</div>
+  </div>
+  
+  <div id="controls">
+    <button class="arcade-btn" id="btn-up">UP</button>
+    <button class="arcade-btn" id="btn-down">DOWN</button>
+  </div>
 </div>
+
+<script>
+  const cvs = document.getElementById('gameCanvas');
+  const ctx = cvs.getContext('2d');
+  const msg = document.getElementById('msg');
+  const scoreDisplay = document.getElementById('score-display');
+  const btnUp = document.getElementById('btn-up');
+  const btnDown = document.getElementById('btn-down');
+  
+  // Strict Color Palette
+  const C_BASE = '#0E2A1E';  // Dark Green
+  const C_SEC  = '#F7C844';  // Gold/Yellow
+  const C_ACC1 = '#540E11';  // Dark Maroon/Brownish Red 
+  const C_ACC2 = '#3D5948';  // Muted Green
+  const C_ACC3 = '#D4D0C5';  // Beige/Hide
+
+  let isPlaying = false, isGameOver = false;
+  let score = 0, frame = 0, speed = 2.5;
+  let bgOffset = 0;
+  
+  // Player State
+  let playerLane = 1; 
+  let returnTimer = null;
+  let isSpinning = false;
+  let spinFrame = 0;
+  
+  let obstacles = [];
+
+  const canoeSprite = [
+    [0,0,0,0,0,1,1,0,0,0,0,0,0,0],
+    [0,0,0,0,0,5,5,5,0,0,0,0,0,0],
+    [0,0,0,0,0,5,5,4,0,0,0,0,0,0],
+    [0,2,2,2,2,2,2,2,2,2,2,2,2,0],
+    [0,0,2,2,2,2,2,2,2,2,2,2,0,0]
+  ];
+
+  // High contrast Beige/Muted Green log
+  const logSprite = [
+    [0,5,5,5,5,5,0],
+    [5,4,4,4,4,4,5],
+    [0,5,5,5,5,5,0]
+  ];
+  
+  // High contrast Beige/Gold rock
+  const rockSprite = [
+    [0,0,5,5,0],
+    [0,5,2,2,5],
+    [5,5,5,5,5]
+  ];
+
+  // Whirlpool spiral
+  const whirlSprite = [
+    [0,5,5,5,0],
+    [5,0,0,0,5],
+    [5,0,5,0,5],
+    [5,0,0,0,5],
+    [0,5,5,5,0]
+  ];
+
+  function drawSprite(sprite, x, y, paletteMap) {
+    for(let r=0; r<sprite.length; r++) {
+      for(let c=0; c<sprite[r].length; c++) {
+        let val = sprite[r][c];
+        if(val !== 0) {
+          ctx.fillStyle = paletteMap[val];
+          ctx.fillRect(x + c*2, y + r*2, 2, 2); 
+        }
+      }
+    }
+  }
+
+  function spawnObstacle() {
+    if(frame % Math.max(35, 90 - Math.floor(score/100)) === 0) {
+      let lane = Math.floor(Math.random() * 3);
+      let rand = Math.random();
+      let type = 'log';
+      
+      // 15% Whirlpool, 45% Rock, 40% Log
+      if(rand > 0.85) type = 'whirlpool';
+      else if(rand > 0.40) type = 'rock';
+
+      obstacles.push({ x: 170, lane: lane, type: type, passed: false, hit: false });
+    }
+  }
+
+  function drawTipi(x, y) {
+    ctx.fillStyle = C_ACC3; 
+    ctx.beginPath(); ctx.moveTo(x+6, y); ctx.lineTo(x+12, y+10); ctx.lineTo(x, y+10); ctx.fill();
+    ctx.fillStyle = C_BASE; 
+    ctx.fillRect(x+5, y-2, 1, 3); ctx.fillRect(x+7, y-2, 1, 3);
+    ctx.fillRect(x+5, y+6, 2, 4);
+  }
+  
+  function drawBuffalo(x, y) {
+    ctx.fillStyle = C_BASE;
+    ctx.fillRect(x+2, y, 6, 4);   
+    ctx.fillRect(x, y+2, 4, 4);   
+    ctx.fillRect(x+2, y+4, 2, 4); 
+    ctx.fillRect(x+6, y+4, 2, 4);
+  }
+  
+  function drawTreePatch(x, y) {
+    ctx.fillStyle = C_ACC2;
+    ctx.fillRect(x+4, y, 8, 8);
+    ctx.fillRect(x, y+4, 16, 6);
+    ctx.fillStyle = C_BASE;
+    ctx.fillRect(x+6, y+8, 4, 6); 
+  }
+
+  function drawScene() {
+    ctx.fillStyle = C_ACC3; 
+    ctx.fillRect(0, 0, 160, 80);
+
+    ctx.fillStyle = C_SEC; 
+    ctx.fillRect(0, 20, 160, 16);
+    let grassOffset = (bgOffset * 0.3) % 40;
+    ctx.fillStyle = C_ACC2;
+    for(let i=-40; i<200; i+=20) {
+      ctx.fillRect(i - grassOffset, 22, 2, 4);
+      ctx.fillRect(i - grassOffset + 8, 26, 2, 3);
+    }
+
+    let sceneOffset = (bgOffset * 0.4) % 240;
+    for(let i=-240; i<320; i+=240) {
+      drawTreePatch(i - sceneOffset + 20, 12);
+      drawBuffalo(i - sceneOffset + 70, 24);
+      drawBuffalo(i - sceneOffset + 85, 26);
+      drawTipi(i - sceneOffset + 130, 18);
+      drawTipi(i - sceneOffset + 145, 20);
+      drawTreePatch(i - sceneOffset + 190, 14);
+    }
+
+    // River
+    ctx.fillStyle = C_ACC1; 
+    ctx.fillRect(0, 36, 160, 44);
+
+    // High Contrast River Current Lines (Beige/Foam)
+    ctx.fillStyle = C_ACC3; 
+    for(let i=0; i<6; i++) {
+      ctx.fillRect((bgOffset + i*35) % 160, 42, 14, 2);
+      ctx.fillRect(((bgOffset*1.1) + i*40 + 20) % 160, 56, 10, 2);
+      ctx.fillRect(((bgOffset*1.2) + i*30 + 10) % 160, 70, 16, 2);
+    }
+
+    // Draw Obstacles
+    for(let i=0; i<obstacles.length; i++) {
+      let obs = obstacles[i];
+      let yPos = obs.lane === 0 ? 38 : (obs.lane === 1 ? 52 : 66);
+      
+      if(obs.type === 'whirlpool') {
+        ctx.save();
+        ctx.translate(obs.x + 5, yPos + 5);
+        ctx.rotate(frame * 0.2); // Animate spinning whirlpool
+        ctx.translate(-(obs.x + 5), -(yPos + 5));
+        drawSprite(whirlSprite, obs.x, yPos, {5: C_ACC3});
+        ctx.restore();
+      } else {
+        let palette = obs.type === 'log' ? {4: C_ACC2, 5: C_ACC3} : {2: C_SEC, 5: C_ACC3};
+        let sprite = obs.type === 'log' ? logSprite : rockSprite;
+        drawSprite(sprite, obs.x, yPos, palette);
+      }
+    }
+
+    // Draw Player
+    let playerY = playerLane === 0 ? 34 : (playerLane === 1 ? 48 : 62);
+    
+    if (isSpinning) {
+      // Spinning dizzy animation
+      ctx.save();
+      ctx.translate(29, playerY + 5); 
+      ctx.rotate((60 - spinFrame) * 0.4); 
+      ctx.translate(-29, -(playerY + 5));
+      drawSprite(canoeSprite, 15, playerY, {1: C_BASE, 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
+      ctx.restore();
+    } else {
+      let bob = (frame % 12 < 6) ? 1 : 0;
+      drawSprite(canoeSprite, 15, playerY + bob, {1: C_BASE, 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
+    }
+  }
+
+  function checkCollisions() {
+    let pBox = { x: 19, y: playerLane === 0 ? 34 : (playerLane === 1 ? 48 : 62), w: 20, h: 8 };
+    
+    for(let i=0; i<obstacles.length; i++) {
+      let obs = obstacles[i];
+      let oBox = { x: obs.x, y: obs.lane === 0 ? 38 : (obs.lane === 1 ? 52 : 66), w: 10, h: 6 };
+      
+      if (!obs.hit && pBox.x < oBox.x + oBox.w && pBox.x + pBox.w > oBox.x &&
+          pBox.y < oBox.y + oBox.h && pBox.y + pBox.h > oBox.y) {
+        
+        if(obs.type === 'whirlpool') {
+          obs.hit = true;
+          isSpinning = true;
+          spinFrame = 60; // Approx 1 second of spinning
+          playerLane = 1; // Dragged back to center line
+          btnUp.classList.add('disabled');
+          btnDown.classList.add('disabled');
+        } else {
+          gameOver();
+        }
+      }
+      
+      if(!obs.passed && obs.x < 15) {
+        if(!obs.hit) score += 10; // Don't reward points for whirlpools hit
+        obs.passed = true;
+      }
+    }
+  }
+
+  function update() {
+    if(!isPlaying) return;
+    
+    bgOffset += speed;
+    scoreDisplay.innerText = 'DIST: ' + score;
+    speed += 0.0015; 
+
+    if (isSpinning) {
+      spinFrame--;
+      if (spinFrame <= 0) {
+        isSpinning = false;
+        btnUp.classList.remove('disabled');
+        btnDown.classList.remove('disabled');
+      }
+    }
+
+    for(let i=0; i<obstacles.length; i++) {
+      obstacles[i].x -= speed;
+    }
+    obstacles = obstacles.filter(o => o.x > -20);
+
+    spawnObstacle();
+    drawScene();
+    checkCollisions();
+    
+    frame++;
+    requestAnimationFrame(update);
+  }
+
+  function movePlayer(direction) {
+    if(!isPlaying || isGameOver || isSpinning) return;
+    
+    clearTimeout(returnTimer);
+    
+    if(direction === 'up') playerLane = 0;
+    if(direction === 'down') playerLane = 2;
+    
+    returnTimer = setTimeout(() => {
+      if(isPlaying && !isSpinning) playerLane = 1;
+    }, 800);
+  }
+
+  function startGame() {
+    isPlaying = true;
+    isGameOver = false;
+    isSpinning = false;
+    btnUp.classList.remove('disabled');
+    btnDown.classList.remove('disabled');
+    score = 0;
+    speed = 2.5;
+    obstacles = [];
+    playerLane = 1;
+    msg.style.display = 'none';
+    update();
+  }
+
+  function gameOver() {
+    isPlaying = false;
+    isGameOver = true;
+    msg.innerHTML = "CRASHED!<br><br>TAP TO RESTART";
+    msg.style.display = 'block';
+  }
+
+  // Controls
+  btnUp.addEventListener('mousedown', (e) => { e.preventDefault(); movePlayer('up'); });
+  btnUp.addEventListener('touchstart', (e) => { e.preventDefault(); movePlayer('up'); });
+  
+  btnDown.addEventListener('mousedown', (e) => { e.preventDefault(); movePlayer('down'); });
+  btnDown.addEventListener('touchstart', (e) => { e.preventDefault(); movePlayer('down'); });
+
+  // Start on screen tap
+  document.getElementById('screen-container').addEventListener('click', () => {
+    if(!isPlaying) startGame();
+  });
+
+  // Initial render
+  msg.style.display = 'block';
+  drawScene();
+
+</script>
+</body>
+</html>
