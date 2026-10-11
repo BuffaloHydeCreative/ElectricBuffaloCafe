@@ -42,25 +42,6 @@
     font-size: 14px; padding: 6px 12px; display: none; white-space: nowrap;
     border: 2px solid #F7C844; text-align: center;
   }
-  #controls {
-    flex: 0 0 auto; display: flex; justify-content: space-between;
-    margin-top: 15px; gap: 10px;
-  }
-  .arcade-btn {
-    flex: 1; padding: 25px 0;
-    background: #540E11; color: #F7C844;
-    border: 4px solid #D4D0C5; border-radius: 8px;
-    font-family: inherit; font-weight: 900; font-size: 18px;
-    cursor: pointer; touch-action: manipulation;
-    text-transform: uppercase; box-shadow: 0 6px 0 #3D5948;
-    transition: transform 0.1s, box-shadow 0.1s;
-  }
-  .arcade-btn:active {
-    transform: translateY(6px); box-shadow: 0 0px 0 #3D5948; background: #3a080a;
-  }
-  .arcade-btn.disabled {
-    opacity: 0.5; pointer-events: none;
-  }
 </style>
 </head>
 <body>
@@ -72,12 +53,7 @@
   
   <div id="screen-container">
     <canvas id="gameCanvas" width="160" height="80"></canvas>
-    <div id="msg">TAP TO START</div>
-  </div>
-  
-  <div id="controls">
-    <button class="arcade-btn" id="btn-up">UP</button>
-    <button class="arcade-btn" id="btn-down">DOWN</button>
+    <div id="msg">PRESS 'A' TO START</div>
   </div>
 </div>
 
@@ -86,8 +62,6 @@
   const ctx = cvs.getContext('2d');
   const msg = document.getElementById('msg');
   const scoreDisplay = document.getElementById('score-display');
-  const btnUp = document.getElementById('btn-up');
-  const btnDown = document.getElementById('btn-down');
   
   // Strict Color Palette
   const C_BASE = '#0E2A1E';  // Dark Green
@@ -116,21 +90,18 @@
     [0,0,2,2,2,2,2,2,2,2,2,2,0,0]
   ];
 
-  // High contrast Beige/Muted Green log
   const logSprite = [
     [0,5,5,5,5,5,0],
     [5,4,4,4,4,4,5],
     [0,5,5,5,5,5,0]
   ];
   
-  // High contrast Beige/Gold rock
   const rockSprite = [
     [0,0,5,5,0],
     [0,5,2,2,5],
     [5,5,5,5,5]
   ];
 
-  // Whirlpool spiral
   const whirlSprite = [
     [0,5,5,5,0],
     [5,0,0,0,5],
@@ -157,7 +128,6 @@
       let rand = Math.random();
       let type = 'log';
       
-      // 15% Whirlpool, 45% Rock, 40% Log
       if(rand > 0.85) type = 'whirlpool';
       else if(rand > 0.40) type = 'rock';
 
@@ -212,11 +182,9 @@
       drawTreePatch(i - sceneOffset + 190, 14);
     }
 
-    // River
     ctx.fillStyle = C_ACC1; 
     ctx.fillRect(0, 36, 160, 44);
 
-    // High Contrast River Current Lines (Beige/Foam)
     ctx.fillStyle = C_ACC3; 
     for(let i=0; i<6; i++) {
       ctx.fillRect((bgOffset + i*35) % 160, 42, 14, 2);
@@ -224,7 +192,6 @@
       ctx.fillRect(((bgOffset*1.2) + i*30 + 10) % 160, 70, 16, 2);
     }
 
-    // Draw Obstacles
     for(let i=0; i<obstacles.length; i++) {
       let obs = obstacles[i];
       let yPos = obs.lane === 0 ? 38 : (obs.lane === 1 ? 52 : 66);
@@ -232,7 +199,7 @@
       if(obs.type === 'whirlpool') {
         ctx.save();
         ctx.translate(obs.x + 5, yPos + 5);
-        ctx.rotate(frame * 0.2); // Animate spinning whirlpool
+        ctx.rotate(frame * 0.2); 
         ctx.translate(-(obs.x + 5), -(yPos + 5));
         drawSprite(whirlSprite, obs.x, yPos, {5: C_ACC3});
         ctx.restore();
@@ -243,11 +210,9 @@
       }
     }
 
-    // Draw Player
     let playerY = playerLane === 0 ? 34 : (playerLane === 1 ? 48 : 62);
     
     if (isSpinning) {
-      // Spinning dizzy animation
       ctx.save();
       ctx.translate(29, playerY + 5); 
       ctx.rotate((60 - spinFrame) * 0.4); 
@@ -273,17 +238,15 @@
         if(obs.type === 'whirlpool') {
           obs.hit = true;
           isSpinning = true;
-          spinFrame = 60; // Approx 1 second of spinning
-          playerLane = 1; // Dragged back to center line
-          btnUp.classList.add('disabled');
-          btnDown.classList.add('disabled');
+          spinFrame = 60; 
+          playerLane = 1; 
         } else {
           gameOver();
         }
       }
       
       if(!obs.passed && obs.x < 15) {
-        if(!obs.hit) score += 10; // Don't reward points for whirlpools hit
+        if(!obs.hit) score += 10; 
         obs.passed = true;
       }
     }
@@ -298,11 +261,7 @@
 
     if (isSpinning) {
       spinFrame--;
-      if (spinFrame <= 0) {
-        isSpinning = false;
-        btnUp.classList.remove('disabled');
-        btnDown.classList.remove('disabled');
-      }
+      if (spinFrame <= 0) isSpinning = false;
     }
 
     for(let i=0; i<obstacles.length; i++) {
@@ -335,8 +294,6 @@
     isPlaying = true;
     isGameOver = false;
     isSpinning = false;
-    btnUp.classList.remove('disabled');
-    btnDown.classList.remove('disabled');
     score = 0;
     speed = 2.5;
     obstacles = [];
@@ -348,18 +305,25 @@
   function gameOver() {
     isPlaying = false;
     isGameOver = true;
-    msg.innerHTML = "CRASHED!<br><br>TAP TO RESTART";
+    msg.innerHTML = "CRASHED!<br><br>PRESS 'A' TO RESTART";
     msg.style.display = 'block';
   }
 
-  // Controls
-  btnUp.addEventListener('mousedown', (e) => { e.preventDefault(); movePlayer('up'); });
-  btnUp.addEventListener('touchstart', (e) => { e.preventDefault(); movePlayer('up'); });
-  
-  btnDown.addEventListener('mousedown', (e) => { e.preventDefault(); movePlayer('down'); });
-  btnDown.addEventListener('touchstart', (e) => { e.preventDefault(); movePlayer('down'); });
+  // --- NEW: Arcade Cabinet UI postMessage Listener ---
+  window.addEventListener('message', function(event) {
+    const command = event.data;
+    
+    if (command === 'DPAD_UP') {
+      movePlayer('up');
+    } else if (command === 'DPAD_DOWN') {
+      movePlayer('down');
+    } else if (command === 'BUTTON_A') {
+      // Start or Restart the game if not currently playing
+      if (!isPlaying) startGame();
+    }
+  });
 
-  // Start on screen tap
+  // Fallback Start on screen tap just in case it's played outside the cabinet
   document.getElementById('screen-container').addEventListener('click', () => {
     if(!isPlaying) startGame();
   });
