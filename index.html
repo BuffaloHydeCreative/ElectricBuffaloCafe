@@ -8,7 +8,7 @@
     /* Global Reset & Base */
     body { 
       margin: 0; padding: 0; 
-      background: transparent; 
+      background: #000; 
       color: #fff; 
       font-family: 'Courier New', Courier, monospace; 
       display: flex; justify-content: center; align-items: center;
@@ -175,7 +175,7 @@
       flex-direction: column;
       align-items: center;
       gap: 5px;
-      margin-top: 40px; /* Pushes it down slightly */
+      margin-top: 40px;
     }
 
     .home-btn {
@@ -235,6 +235,7 @@
       font-size: 12px;
       font-weight: bold;
       color: #888;
+      white-space: nowrap;
     }
   </style>
 </head>
@@ -277,7 +278,7 @@
         <div class="d-center"></div>
       </div>
 
-      <!-- Center Home / Start Button -->
+      <!-- Center Home Button -->
       <div class="home-container">
         <div class="home-btn" onclick="btnHome()"></div>
         <span class="home-label">HOME</span>
@@ -286,4 +287,80 @@
       <!-- Action Buttons -->
       <div class="action-container">
         <div class="action-btn-wrapper">
-          <div class="action-btn btn-b" onclick="btn
+          <div class="action-btn btn-b" onclick="btnAction('BUTTON_B')"></div>
+          <span class="btn-label">BUTTON B</span>
+        </div>
+        <div class="action-btn-wrapper">
+          <div class="action-btn btn-a" onclick="btnAction('BUTTON_A')"></div>
+          <span class="btn-label">BUTTON A</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    let currentIndex = 0;
+    const games = [
+      'game1.html', 'game2.html', 'game3.html', 
+      'game4.html', 'game5.html', 'game6.html', 'game7.html'
+    ];
+    let isPlaying = false;
+
+    const listItems = document.querySelectorAll('#game-list li');
+    const dosMenu = document.getElementById('dos-menu');
+    const gameFrame = document.getElementById('arcade-frame');
+
+    // Helper: Broadcasts signal to the iframe
+    function sendSignal(command) {
+      if (isPlaying) {
+        gameFrame.contentWindow.postMessage(command, '*');
+      }
+    }
+
+    // D-Pad Control
+    function pressDpad(directionStr) {
+      if (isPlaying) {
+        sendSignal(directionStr);
+      } else {
+        if (directionStr === 'DPAD_UP') moveMenu(-1);
+        if (directionStr === 'DPAD_DOWN') moveMenu(1);
+      }
+    }
+
+    function moveMenu(direction) {
+      listItems[currentIndex].classList.remove('active');
+      currentIndex += direction;
+      if (currentIndex < 0) currentIndex = games.length - 1;
+      if (currentIndex >= games.length) currentIndex = 0;
+      listItems[currentIndex].classList.add('active');
+    }
+
+    // Action Buttons
+    function btnAction(buttonStr) {
+      if (isPlaying) {
+        sendSignal(buttonStr);
+      } else {
+        if (buttonStr === 'BUTTON_A') {
+          dosMenu.style.display = 'none';
+          gameFrame.style.display = 'block';
+          gameFrame.src = games[currentIndex];
+          isPlaying = true;
+        }
+      }
+    }
+
+    // Home Button
+    function btnHome() {
+      if (isPlaying) {
+        gameFrame.src = ""; // Unload game to save memory
+        gameFrame.style.display = 'none';
+        dosMenu.style.display = 'flex';
+        isPlaying = false;
+      }
+    }
+  </script>
+
+</body>
+</html>
