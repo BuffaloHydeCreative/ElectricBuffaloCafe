@@ -3,163 +3,217 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Festival Arcade Machine</title>
+  <title>Festival Arcade Mobile</title>
   <style>
-    /* Transparent Arcade Cabinet Body */
+    /* Global Reset & Base */
     body { 
       margin: 0; padding: 0; 
       background: transparent; 
       color: #fff; 
       font-family: 'Courier New', Courier, monospace; 
+      display: flex; justify-content: center; align-items: center;
       height: 100vh; overflow: hidden;
+      touch-action: none; /* Prevents mobile browser pull-to-refresh */
     }
 
-    /* Main Arcade Layout */
+    /* Main 9:16 Mobile Arcade Cabinet */
     .arcade-machine {
-      display: flex;
-      flex-direction: row;
-      max-width: 800px;
-      margin: 0 auto;
-      height: 100%;
-      background: rgba(10, 10, 10, 0.85);
-      border-radius: 12px;
-      padding: 15px;
-      box-sizing: border-box;
-    }
-
-    /* Left Side: Vertical Game Selector */
-    .scroller-container {
-      width: 150px;
-      flex-shrink: 0;
+      width: 100%;
+      max-width: 450px;
+      aspect-ratio: 9/16;
+      max-height: 100vh;
+      background: #111;
+      border-radius: 20px;
+      border: 4px solid #333;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      padding-right: 15px;
-      overflow-y: auto;
-      scrollbar-width: none;
-    }
-    .scroller-container::-webkit-scrollbar { display: none; }
-
-    /* Text-Only Game Cards */
-    .game-card {
-      height: 60px;
-      background: #111; 
-      border: 2px solid #444; 
-      border-radius: 6px;
-      display: flex; 
-      align-items: center; 
-      justify-content: center;
-      cursor: pointer; 
-      transition: all 0.2s ease-in-out;
-      color: #aaa;
-      text-transform: uppercase;
-      font-size: 14px;
-      font-weight: bold;
-      text-align: center;
-    }
-
-    /* Active & Hover States */
-    .game-card:hover, .game-card.active {
-      transform: scale(1.05);
-      border-color: #ffcc00;
-      color: #fff;
-      background: #222;
-      box-shadow: 0 0 10px rgba(255, 204, 0, 0.4);
-    }
-
-    /* Center: Neon Tubing (Red & Yellow) */
-    .neon-tubes {
-      display: flex;
-      gap: 8px;
-      padding: 0 15px;
-      flex-shrink: 0;
-    }
-
-    .tube-red {
-      width: 4px;
-      height: 100%;
-      background: #ff9999;
-      border-radius: 4px;
-      box-shadow: 0 0 10px #e60000, 0 0 20px #e60000, 0 0 30px #e60000;
-    }
-
-    .tube-yellow {
-      width: 4px;
-      height: 100%;
-      background: #ffff99;
-      border-radius: 4px;
-      box-shadow: 0 0 10px #ffcc00, 0 0 20px #ffcc00, 0 0 30px #ffcc00;
-    }
-
-    /* Right Side: The CRT Screen */
-    .screen-wrapper {
-      flex: 1;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05);
       position: relative;
+      overflow: hidden;
+    }
+
+    /* --- TOP HALF: CRT MONITOR --- */
+    .monitor-bezel {
+      flex: 0 0 50%;
+      background: #050505;
+      padding: 15px;
+      border-bottom: 4px solid #222;
+      box-sizing: border-box;
       display: flex;
       justify-content: center;
       align-items: center;
-      min-width: 0; /* Prevents flex overflow */
     }
 
-    .crt-monitor {
+    .crt-screen {
       width: 100%;
-      max-width: 500px;
-      aspect-ratio: 3/4;
-      max-height: 100%;
-      position: relative;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-      border: 12px solid #222;
+      height: 100%;
       background: #000;
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      border: 6px solid #1a1a1a;
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
     }
 
-    iframe {
-      width: 100%; 
-      height: 100%; 
+    /* The DOS Style Menu Overlay */
+    #dos-menu {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: #000;
+      color: #33ff33;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+
+    .dos-header {
+      font-weight: bold;
+      margin-bottom: 15px;
+      border-bottom: 2px dashed #33ff33;
+      padding-bottom: 5px;
+    }
+
+    .dos-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .dos-list li {
+      font-size: 14px;
+      text-transform: uppercase;
+      opacity: 0.5;
+    }
+
+    .dos-list li.active {
+      opacity: 1;
+      font-weight: bold;
+      background: #33ff33;
+      color: #000;
+    }
+
+    .dos-list li::before {
+      content: "  ";
+      white-space: pre;
+    }
+
+    .dos-list li.active::before {
+      content: "> ";
+    }
+
+    /* Game iFrame (Hidden by default) */
+    #arcade-frame {
+      width: 100%;
+      height: 100%;
       border: none;
-      display: block;
+      display: none;
+      position: absolute;
+      top: 0; left: 0;
+      z-index: 5;
     }
 
     /* CRT Scanline Overlay */
-    .crt-monitor::after {
+    .crt-screen::after {
       content: " ";
       display: block;
       position: absolute;
       top: 0; left: 0; bottom: 0; right: 0;
       background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-      z-index: 2;
+      z-index: 20;
       background-size: 100% 3px, 3px 100%;
       pointer-events: none;
-      box-shadow: inset 0 0 50px rgba(0,0,0,0.9);
+      box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
     }
 
-    /* Mobile Responsiveness: Stack Vertically on Small Screens */
-    @media (max-width: 600px) {
-      .arcade-machine {
-        flex-direction: column;
-        padding: 10px;
-      }
-      .scroller-container {
-        width: 100%;
-        flex-direction: row;
-        overflow-x: auto;
-        padding-right: 0;
-        padding-bottom: 10px;
-      }
-      .game-card {
-        flex: 0 0 120px;
-        height: 45px;
-      }
-      .neon-tubes {
-        flex-direction: column;
-        padding: 10px 0;
-        height: 20px;
-      }
-      .tube-red, .tube-yellow {
-        width: 100%;
-        height: 4px;
-      }
+    /* --- BOTTOM HALF: CONTROL PAD --- */
+    .control-deck {
+      flex: 1;
+      background: #1e1e1e;
+      position: relative;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* D-Pad (Left Side) */
+    .d-pad-container {
+      width: 120px;
+      height: 120px;
+      position: relative;
+    }
+    
+    .d-pad-btn {
+      position: absolute;
+      background: #333;
+      border: 4px solid #111;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #000;
+    }
+
+    .d-pad-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 0 0 #000;
+      background: #444;
+    }
+
+    .d-up { top: 0; left: 40px; width: 40px; height: 45px; border-bottom: none; border-radius: 8px 8px 0 0; }
+    .d-down { bottom: 0; left: 40px; width: 40px; height: 45px; border-top: none; border-radius: 0 0 8px 8px; }
+    .d-left { top: 40px; left: 0; width: 45px; height: 40px; border-right: none; border-radius: 8px 0 0 8px; }
+    .d-right { top: 40px; right: 0; width: 45px; height: 40px; border-left: none; border-radius: 0 8px 8px 0; }
+    .d-center { top: 40px; left: 40px; width: 40px; height: 40px; background: #333; border: none; }
+
+    /* Action Buttons (Right Side) */
+    .action-container {
+      display: flex;
+      gap: 15px;
+      transform: rotate(-15deg); /* Classic retro slant */
+    }
+
+    .action-btn-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .action-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 4px solid #111;
+      cursor: pointer;
+      box-shadow: 0 6px 0 #000;
+    }
+
+    .action-btn:active {
+      transform: translateY(6px);
+      box-shadow: 0 0 0 #000;
+    }
+
+    .btn-b { background: #ffcc00; margin-top: 25px; }
+    .btn-a { background: #e60000; }
+
+    .btn-label {
+      font-size: 12px;
+      font-weight: bold;
+      color: #888;
+    }
+    
+    /* Decoration Line */
+    .deck-lines {
+      position: absolute;
+      bottom: 20px; right: 20px;
+      width: 100px;
+      height: 4px;
+      background: #333;
+      box-shadow: 0 10px 0 #333, 0 20px 0 #333;
     }
   </style>
 </head>
@@ -167,39 +221,113 @@
 
   <div class="arcade-machine">
     
-    <!-- Left: Vertical Game Menu -->
-    <div class="scroller-container">
-      <div class="game-card active" onclick="loadGame('game1.html', this)"><div>Game 1</div></div>
-      <div class="game-card" onclick="loadGame('game2.html', this)"><div>Game 2</div></div>
-      <div class="game-card" onclick="loadGame('game3.html', this)"><div>Game 3</div></div>
-      <div class="game-card" onclick="loadGame('game4.html', this)"><div>Game 4</div></div>
-      <div class="game-card" onclick="loadGame('game5.html', this)"><div>Game 5</div></div>
-      <div class="game-card" onclick="loadGame('game6.html', this)"><div>Game 6</div></div>
-      <div class="game-card" onclick="loadGame('game7.html', this)"><div>Game 7</div></div>
-    </div>
+    <!-- CRT MONITOR -->
+    <div class="monitor-bezel">
+      <div class="crt-screen">
+        
+        <!-- OS Menu -->
+        <div id="dos-menu">
+          <div class="dos-header">FESTIVAL_OS.EXE<br>MEM OK...</div>
+          <ul class="dos-list" id="game-list">
+            <li class="active">game1.html</li>
+            <li>game2.html</li>
+            <li>game3.html</li>
+            <li>game4.html</li>
+            <li>game5.html</li>
+            <li>game6.html</li>
+            <li>game7.html</li>
+          </ul>
+        </div>
 
-    <!-- Center: Glowing Neon Arcade Tubing -->
-    <div class="neon-tubes">
-      <div class="tube-red"></div>
-      <div class="tube-yellow"></div>
-    </div>
-
-    <!-- Right: CRT Monitor -->
-    <div class="screen-wrapper">
-      <div class="crt-monitor">
-        <iframe id="arcade-screen" src="game1.html" title="Arcade Screen"></iframe>
+        <!-- The Game Player -->
+        <iframe id="arcade-frame" title="Game Screen"></iframe>
       </div>
+    </div>
+
+    <!-- CONTROL PAD -->
+    <div class="control-deck">
+      
+      <!-- Directional Pad -->
+      <div class="d-pad-container">
+        <div class="d-pad-btn d-up" onclick="moveMenu(-1)"></div>
+        <div class="d-pad-btn d-right"></div>
+        <div class="d-pad-btn d-down" onclick="moveMenu(1)"></div>
+        <div class="d-pad-btn d-left"></div>
+        <div class="d-center"></div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="action-container">
+        <div class="action-btn-wrapper">
+          <div class="action-btn btn-b" onclick="btnB()"></div>
+          <span class="btn-label">B (BACK)</span>
+        </div>
+        <div class="action-btn-wrapper">
+          <div class="action-btn btn-a" onclick="btnA()"></div>
+          <span class="btn-label">A (START)</span>
+        </div>
+      </div>
+
+      <div class="deck-lines"></div>
+
     </div>
 
   </div>
 
   <script>
-    function loadGame(url, cardElement) {
-      document.getElementById('arcade-screen').src = url;
-      const cards = document.querySelectorAll('.game-card');
-      cards.forEach(card => card.classList.remove('active'));
-      cardElement.classList.add('active');
-      cardElement.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    let currentIndex = 0;
+    const games = [
+      'game1.html', 'game2.html', 'game3.html', 
+      'game4.html', 'game5.html', 'game6.html', 'game7.html'
+    ];
+    let isPlaying = false;
+
+    const listItems = document.querySelectorAll('#game-list li');
+    const dosMenu = document.getElementById('dos-menu');
+    const gameFrame = document.getElementById('arcade-frame');
+
+    // D-Pad Up/Down Logic for Menu
+    function moveMenu(direction) {
+      if (isPlaying) {
+        // If a game is playing, eventually we can pass the D-Pad clicks into the iframe here
+        return; 
+      }
+
+      // Remove active class from current
+      listItems[currentIndex].classList.remove('active');
+      
+      // Calculate new index
+      currentIndex += direction;
+      if (currentIndex < 0) currentIndex = games.length - 1;
+      if (currentIndex >= games.length) currentIndex = 0;
+      
+      // Add active class to new
+      listItems[currentIndex].classList.add('active');
+    }
+
+    // Button A Logic (Select/Start)
+    function btnA() {
+      if (isPlaying) {
+        // Pass Action A to the game later if needed
+        return;
+      }
+      
+      // Hide Menu, Show Game
+      dosMenu.style.display = 'none';
+      gameFrame.style.display = 'block';
+      gameFrame.src = games[currentIndex];
+      isPlaying = true;
+    }
+
+    // Button B Logic (Back/Quit)
+    function btnB() {
+      if (!isPlaying) return;
+
+      // Unload Game, Show Menu
+      gameFrame.src = "";
+      gameFrame.style.display = 'none';
+      dosMenu.style.display = 'flex';
+      isPlaying = false;
     }
   </script>
 
