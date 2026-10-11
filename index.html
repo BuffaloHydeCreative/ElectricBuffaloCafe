@@ -13,7 +13,7 @@
       font-family: 'Courier New', Courier, monospace; 
       display: flex; justify-content: center; align-items: center;
       height: 100vh; overflow: hidden;
-      touch-action: none; /* Prevents mobile browser pull-to-refresh */
+      touch-action: none; 
     }
 
     /* Main 9:16 Mobile Arcade Cabinet */
@@ -106,7 +106,7 @@
       content: "> ";
     }
 
-    /* Game iFrame (Hidden by default) */
+    /* Game iFrame */
     #arcade-frame {
       width: 100%;
       height: 100%;
@@ -169,11 +169,42 @@
     .d-right { top: 40px; right: 0; width: 45px; height: 40px; border-left: none; border-radius: 0 8px 8px 0; }
     .d-center { top: 40px; left: 40px; width: 40px; height: 40px; background: #333; border: none; }
 
+    /* Center Home Button */
+    .home-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      margin-top: 40px; /* Pushes it down slightly */
+    }
+
+    .home-btn {
+      width: 45px;
+      height: 20px;
+      background: #555;
+      border-radius: 10px;
+      border: 3px solid #111;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #000;
+    }
+
+    .home-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 0 0 #000;
+    }
+
+    .home-label {
+      font-size: 10px;
+      font-weight: bold;
+      color: #888;
+      letter-spacing: 1px;
+    }
+
     /* Action Buttons (Right Side) */
     .action-container {
       display: flex;
       gap: 15px;
-      transform: rotate(-15deg); /* Classic retro slant */
+      transform: rotate(-15deg); 
     }
 
     .action-btn-wrapper {
@@ -204,16 +235,6 @@
       font-size: 12px;
       font-weight: bold;
       color: #888;
-    }
-    
-    /* Decoration Line */
-    .deck-lines {
-      position: absolute;
-      bottom: 20px; right: 20px;
-      width: 100px;
-      height: 4px;
-      background: #333;
-      box-shadow: 0 10px 0 #333, 0 20px 0 #333;
     }
   </style>
 </head>
@@ -249,87 +270,20 @@
       
       <!-- Directional Pad -->
       <div class="d-pad-container">
-        <div class="d-pad-btn d-up" onclick="moveMenu(-1)"></div>
-        <div class="d-pad-btn d-right"></div>
-        <div class="d-pad-btn d-down" onclick="moveMenu(1)"></div>
-        <div class="d-pad-btn d-left"></div>
+        <div class="d-pad-btn d-up" onclick="pressDpad('DPAD_UP')"></div>
+        <div class="d-pad-btn d-right" onclick="pressDpad('DPAD_RIGHT')"></div>
+        <div class="d-pad-btn d-down" onclick="pressDpad('DPAD_DOWN')"></div>
+        <div class="d-pad-btn d-left" onclick="pressDpad('DPAD_LEFT')"></div>
         <div class="d-center"></div>
+      </div>
+
+      <!-- Center Home / Start Button -->
+      <div class="home-container">
+        <div class="home-btn" onclick="btnHome()"></div>
+        <span class="home-label">HOME</span>
       </div>
 
       <!-- Action Buttons -->
       <div class="action-container">
         <div class="action-btn-wrapper">
-          <div class="action-btn btn-b" onclick="btnB()"></div>
-          <span class="btn-label">B (BACK)</span>
-        </div>
-        <div class="action-btn-wrapper">
-          <div class="action-btn btn-a" onclick="btnA()"></div>
-          <span class="btn-label">A (START)</span>
-        </div>
-      </div>
-
-      <div class="deck-lines"></div>
-
-    </div>
-
-  </div>
-
-  <script>
-    let currentIndex = 0;
-    const games = [
-      'game1.html', 'game2.html', 'game3.html', 
-      'game4.html', 'game5.html', 'game6.html', 'game7.html'
-    ];
-    let isPlaying = false;
-
-    const listItems = document.querySelectorAll('#game-list li');
-    const dosMenu = document.getElementById('dos-menu');
-    const gameFrame = document.getElementById('arcade-frame');
-
-    // D-Pad Up/Down Logic for Menu
-    function moveMenu(direction) {
-      if (isPlaying) {
-        // If a game is playing, eventually we can pass the D-Pad clicks into the iframe here
-        return; 
-      }
-
-      // Remove active class from current
-      listItems[currentIndex].classList.remove('active');
-      
-      // Calculate new index
-      currentIndex += direction;
-      if (currentIndex < 0) currentIndex = games.length - 1;
-      if (currentIndex >= games.length) currentIndex = 0;
-      
-      // Add active class to new
-      listItems[currentIndex].classList.add('active');
-    }
-
-    // Button A Logic (Select/Start)
-    function btnA() {
-      if (isPlaying) {
-        // Pass Action A to the game later if needed
-        return;
-      }
-      
-      // Hide Menu, Show Game
-      dosMenu.style.display = 'none';
-      gameFrame.style.display = 'block';
-      gameFrame.src = games[currentIndex];
-      isPlaying = true;
-    }
-
-    // Button B Logic (Back/Quit)
-    function btnB() {
-      if (!isPlaying) return;
-
-      // Unload Game, Show Menu
-      gameFrame.src = "";
-      gameFrame.style.display = 'none';
-      dosMenu.style.display = 'flex';
-      isPlaying = false;
-    }
-  </script>
-
-</body>
-</html>
+          <div class="action-btn btn-b" onclick="btn
