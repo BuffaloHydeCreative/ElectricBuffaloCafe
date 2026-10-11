@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f8fafc; margin: 0; padding: 20px; text-align: center; }
+    h2 { color: #1e293b; margin-top: 0; }
+    .button-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+    button { 
+      padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; 
+      color: white; cursor: pointer; transition: opacity 0.2s; 
+    }
+    button:hover { opacity: 0.9; }
+    button:active { transform: scale(0.96); }
+    .btn-tamagotchi { background: #C51E40; }
+    .btn-jig { background: #2BAAB2; }
+    .btn-river { background: #540E11; }
+    .arcade-container { 
+      max-width: 500px; margin: 0 auto; aspect-ratio: 3/4; min-height: 650px; 
+      border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 4px solid #1e293b;
+    }
+    iframe { width: 100%; height: 100%; border: none; }
+  </style>
+</head>
+<body>
+
+  <h2>FESTIVAL ARCADE</h2>
+  
+  <div class="button-group">
+    <button class="btn-tamagotchi" onclick="document.getElementById('game-screen').src='tamagotchi.html'">Red Carpet Sabe</button>
+    <button class="btn-jig" onclick="document.getElementById('game-screen').src='jig.html'">Learn to Jig</button>
+    <button class="btn-river" onclick="document.getElementById('game-screen').src='river-run.html'">River Run</button>
+  </div>
+
+  <div class="arcade-container">
+    <iframe id="game-screen" src="tamagotchi.html" scrolling="no" title="Arcade Screen"></iframe>
+  </div>
+
+</body>
+</html>
