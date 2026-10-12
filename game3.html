@@ -315,16 +315,50 @@
             if (gameState === 'START') {
                 ctx.fillStyle = 'rgba(0,0,0,0.85)';
                 ctx.fillRect(OFFSET_X, OFFSET_Y, COLS * CELL_SIZE, ROWS * CELL_SIZE);
+                
+                // Title
                 ctx.fillStyle = '#ff003c';
                 ctx.font = 'bold 26px Courier New';
                 ctx.textAlign = 'center';
-                ctx.fillText("MAKE 3x3 FLOWERS", canvas.width/2, OFFSET_Y + 150);
+                ctx.fillText("MAKE 3x3 FLOWERS", canvas.width/2, OFFSET_Y + 80);
                 
+                // --- Visual Example Flower ---
+                let exX = canvas.width / 2;
+                let exY = OFFSET_Y + 145;
+                let spacing = 28; // Spacing for the mini-grid
+                
+                const drawMiniBead = (bx, by, cCode) => {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = GLOWS[cCode];
+                    ctx.fillStyle = COLORS[cCode];
+                    ctx.beginPath();
+                    ctx.arc(bx, by, spacing / 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(bx, by, spacing / 10, 0, Math.PI * 2);
+                    ctx.fill();
+                };
+
+                // Draw Red (1) petals and Yellow (3) center
+                drawMiniBead(exX, exY - spacing, 1); // Top
+                drawMiniBead(exX, exY + spacing, 1); // Bottom
+                drawMiniBead(exX - spacing, exY, 1); // Left
+                drawMiniBead(exX + spacing, exY, 1); // Right
+                drawMiniBead(exX, exY, 3);           // Center
+                // -----------------------------
+                
+                // Instructions
                 ctx.fillStyle = '#33ff33';
                 ctx.font = 'bold 16px Courier New';
-                ctx.fillText("PETALS MUST MATCH", canvas.width/2, OFFSET_Y + 190);
-                ctx.fillText("CENTER MUST DIFFER", canvas.width/2, OFFSET_Y + 220);
-                ctx.fillText("PRESS 'A' TO START", canvas.width/2, OFFSET_Y + 280);
+                ctx.fillText("PETALS MUST MATCH", canvas.width/2, OFFSET_Y + 220);
+                ctx.fillText("CENTER MUST DIFFER", canvas.width/2, OFFSET_Y + 250);
+                
+                // Start Prompt
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 18px Courier New';
+                ctx.fillText("PRESS 'A' TO START", canvas.width/2, OFFSET_Y + 310);
                 return;
             }
 
