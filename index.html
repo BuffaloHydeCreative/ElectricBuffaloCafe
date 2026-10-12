@@ -36,8 +36,8 @@
 
     /* --- SECTION 1: CRT MONITOR (Dynamic Flex Height) --- */
     .monitor-bezel {
-      flex: 1; /* Automatically takes all remaining vertical space */
-      min-height: 250px; /* Ensures the screen never gets too squished */
+      flex: 1;
+      min-height: 250px; 
       background: linear-gradient(to bottom, #000 0%, #151515 100%);
       padding: 15px 15px 5px 15px;
       box-sizing: border-box;
@@ -136,7 +136,7 @@
 
     /* --- SECTION 2: CONTROL DECK (Fixed Height) --- */
     .control-deck {
-      flex: 0 0 160px; /* Locked height so controls never disappear */
+      flex: 0 0 160px;
       background: linear-gradient(to bottom, #2b2b2b 0%, #1a1a1a 15%, #111 100%);
       border-top: 3px solid #666; 
       border-bottom: 8px solid #000; 
@@ -150,7 +150,7 @@
       box-sizing: border-box;
     }
 
-    /* Digital Joystick */
+    /* Analog-Style Drag Joystick */
     .joystick-base {
       width: 120px;
       height: 120px;
@@ -159,17 +159,13 @@
       border: 4px solid #050505;
       box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 2px 5px rgba(255,255,255,0.1);
       position: relative;
+      touch-action: none; /* Prevents scrolling while dragging */
+      cursor: grab;
     }
 
-    .j-dir {
-      position: absolute;
-      z-index: 2;
-      cursor: pointer;
+    .joystick-base:active {
+      cursor: grabbing;
     }
-    .j-up { top: 0; left: 30px; width: 60px; height: 60px; border-radius: 30px 30px 0 0; }
-    .j-down { bottom: 0; left: 30px; width: 60px; height: 60px; border-radius: 0 0 30px 30px; }
-    .j-left { top: 30px; left: 0; width: 60px; height: 60px; border-radius: 30px 0 0 30px; }
-    .j-right { top: 30px; right: 0; width: 60px; height: 60px; border-radius: 0 30px 30px 0; }
 
     /* The Stick Itself */
     .joystick-stick {
@@ -180,15 +176,14 @@
       position: absolute;
       top: 27.5px; left: 27.5px; 
       box-shadow: 8px 12px 15px rgba(0,0,0,0.6), inset -5px -5px 15px rgba(0,0,0,0.7);
-      pointer-events: none;
-      transition: transform 0.05s ease-out;
+      pointer-events: none; /* Allows base to catch all drag events */
+      transition: transform 0.15s ease-out; /* Smooth snap back */
       z-index: 1;
     }
 
-    .j-up:active ~ .joystick-stick { transform: translateY(-12px); box-shadow: 8px 25px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
-    .j-down:active ~ .joystick-stick { transform: translateY(12px); box-shadow: 8px 0px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
-    .j-left:active ~ .joystick-stick { transform: translateX(-12px); box-shadow: 20px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
-    .j-right:active ~ .joystick-stick { transform: translateX(12px); box-shadow: -5px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    .joystick-stick.dragging {
+      transition: none; /* Instantly follow finger/mouse */
+    }
 
     /* Concave Action Buttons */
     .action-container {
@@ -212,6 +207,7 @@
       cursor: pointer;
       position: relative;
       box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 6px 0 #050505, 0 10px 15px rgba(0,0,0,0.6);
+      touch-action: none;
     }
     
     .action-btn::after {
@@ -223,7 +219,7 @@
       pointer-events: none;
     }
 
-    .action-btn:active {
+    .action-btn:active, .action-btn.active-press {
       transform: translateY(6px);
       box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 0 0 #050505, 0 4px 6px rgba(0,0,0,0.6);
     }
@@ -239,7 +235,7 @@
 
     /* --- SECTION 3: FRONT PANEL (Fixed Height) --- */
     .front-panel {
-      flex: 0 0 90px; /* Locked height to guarantee coin door fits */
+      flex: 0 0 90px;
       background: linear-gradient(to bottom, #050505 0%, #111 100%);
       display: flex;
       justify-content: center;
@@ -273,6 +269,7 @@
       justify-content: center;
       align-items: center;
       text-align: center;
+      touch-action: none;
     }
 
     .coin-btn:active {
@@ -315,21 +312,20 @@
 
     <!-- 2. CONTROL DECK -->
     <div class="control-deck">
-      <div class="joystick-base">
-        <div class="j-dir j-up" onmousedown="pressDpad('DPAD_UP')" ontouchstart="pressDpad('DPAD_UP')"></div>
-        <div class="j-dir j-right" onmousedown="pressDpad('DPAD_RIGHT')" ontouchstart="pressDpad('DPAD_RIGHT')"></div>
-        <div class="j-dir j-down" onmousedown="pressDpad('DPAD_DOWN')" ontouchstart="pressDpad('DPAD_DOWN')"></div>
-        <div class="j-dir j-left" onmousedown="pressDpad('DPAD_LEFT')" ontouchstart="pressDpad('DPAD_LEFT')"></div>
-        <div class="joystick-stick"></div>
+      
+      <!-- Drag/Swipe Joystick -->
+      <div class="joystick-base" id="joystick-base">
+        <div class="joystick-stick" id="joystick-stick"></div>
       </div>
 
+      <!-- Action Buttons -->
       <div class="action-container">
         <div class="action-btn-wrapper">
-          <div class="action-btn btn-b" onclick="btnAction('BUTTON_B')"></div>
+          <div class="action-btn btn-b" onmousedown="btnAction('BUTTON_B')" ontouchstart="preventGhostClick(event, 'BUTTON_B')"></div>
           <span class="btn-label">B</span>
         </div>
         <div class="action-btn-wrapper">
-          <div class="action-btn btn-a" onclick="btnAction('BUTTON_A')"></div>
+          <div class="action-btn btn-a" onmousedown="btnAction('BUTTON_A')" ontouchstart="preventGhostClick(event, 'BUTTON_A')"></div>
           <span class="btn-label">A</span>
         </div>
       </div>
@@ -338,7 +334,7 @@
     <!-- 3. FRONT PANEL -->
     <div class="front-panel">
       <div class="coin-door">
-        <div class="coin-btn" onclick="btnHome()">
+        <div class="coin-btn" onmousedown="btnHome()" ontouchstart="preventGhostClick(event, 'HOME')">
           <span class="coin-text">INSERT<br>COIN</span>
         </div>
       </div>
@@ -361,6 +357,19 @@
     function sendSignal(command) {
       if (isPlaying) {
         gameFrame.contentWindow.postMessage(command, '*');
+      }
+    }
+
+    // Single trigger action mapping to stop ghost clicks
+    function preventGhostClick(e, actionType) {
+      e.preventDefault(); 
+      if (actionType === 'BUTTON_A' || actionType === 'BUTTON_B') {
+        btnAction(actionType);
+        // Visual press state
+        e.target.classList.add('active-press');
+        setTimeout(() => e.target.classList.remove('active-press'), 150);
+      } else if (actionType === 'HOME') {
+        btnHome();
       }
     }
 
@@ -402,6 +411,93 @@
         isPlaying = false;
       }
     }
+
+    /* --- ADVANCED JOYSTICK DRAG LOGIC --- */
+    const joyBase = document.getElementById('joystick-base');
+    const joyStick = document.getElementById('joystick-stick');
+    
+    let isDragging = false;
+    let currentDir = null;
+    const maxRadius = 35; // Maximum visual travel of the stick
+    const deadzone = 15;  // Minimum pixels required to trigger a direction
+
+    function startDrag(e) {
+      e.preventDefault();
+      isDragging = true;
+      joyStick.classList.add('dragging');
+      moveDrag(e);
+    }
+
+    function moveDrag(e) {
+      if (!isDragging) return;
+      e.preventDefault();
+
+      const rect = joyBase.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      let clientX, clientY;
+      if (e.touches) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+
+      const dx = clientX - centerX;
+      const dy = clientY - centerY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Clamp visual stick rendering to the max radius
+      let stickX = dx;
+      let stickY = dy;
+      if (distance > maxRadius) {
+        const angle = Math.atan2(dy, dx);
+        stickX = Math.cos(angle) * maxRadius;
+        stickY = Math.sin(angle) * maxRadius;
+      }
+
+      joyStick.style.transform = `translate(${stickX}px, ${stickY}px)`;
+
+      // Logic translation: determine dominant 4-way direction
+      let newDir = null;
+      if (distance > deadzone) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+          newDir = dx > 0 ? 'DPAD_RIGHT' : 'DPAD_LEFT';
+        } else {
+          newDir = dy > 0 ? 'DPAD_DOWN' : 'DPAD_UP';
+        }
+      }
+
+      // Only trigger input if direction state changes
+      if (newDir !== currentDir) {
+        currentDir = newDir;
+        if (currentDir) {
+          pressDpad(currentDir);
+        }
+      }
+    }
+
+    function endDrag(e) {
+      if (e) e.preventDefault();
+      if (!isDragging) return;
+      isDragging = false;
+      currentDir = null;
+      joyStick.classList.remove('dragging');
+      joyStick.style.transform = `translate(0px, 0px)`; // Snap back to center
+    }
+
+    // Attach dragging events (Window listeners ensure tracking if finger slips off base)
+    joyBase.addEventListener('mousedown', startDrag);
+    joyBase.addEventListener('touchstart', startDrag, { passive: false });
+
+    window.addEventListener('mousemove', moveDrag);
+    window.addEventListener('touchmove', moveDrag, { passive: false });
+
+    window.addEventListener('mouseup', endDrag);
+    window.addEventListener('touchend', endDrag);
+
   </script>
 
 </body>
