@@ -47,7 +47,7 @@
 <body>
 <div id="game-container">
   <div id="header">
-    <span>MISKWA-KAMAW SIPIY</span>
+    <span id="title-display">MISKWA-KAMAW SIPIY</span>
     <span id="score-display">DIST: 0</span>
   </div>
   
@@ -62,13 +62,18 @@
   const ctx = cvs.getContext('2d');
   const msg = document.getElementById('msg');
   const scoreDisplay = document.getElementById('score-display');
+  const titleDisplay = document.getElementById('title-display');
   
-  // Strict Color Palette
+  // Custom Extended Palette
   const C_BASE = '#0E2A1E';  // Dark Green
   const C_SEC  = '#F7C844';  // Gold/Yellow
-  const C_ACC1 = '#540E11';  // Dark Maroon/Brownish Red 
+  const C_ACC1 = '#540E11';  // Night Bordeaux (Dark Maroon River)
   const C_ACC2 = '#3D5948';  // Muted Green
   const C_ACC3 = '#D4D0C5';  // Beige/Hide
+  const C_LAKE = '#0F6F9E';  // Cornflower Ocean (Lake Winnipeg)
+  const C_FOAM = '#12AEA2';  // Light Sea Green (Lake Currents)
+  const C_NIGHT = '#2b1a3d'; // Purple Midnight
+  const C_SNOW = '#ffffff';  // Snow White
 
   let isPlaying = false, isGameOver = false;
   let score = 0, frame = 0, speed = 2.5;
@@ -88,6 +93,14 @@
     [0,0,0,0,0,5,5,4,0,0,0,0,0,0],
     [0,2,2,2,2,2,2,2,2,2,2,2,2,0],
     [0,0,2,2,2,2,2,2,2,2,2,2,0,0]
+  ];
+
+  const dogsledSprite = [
+    [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,5,5,5,0,0,0,0,0],
+    [0,0,0,0,0,0,0,5,5,1,0,0,0,0,0],
+    [0,2,2,0,2,2,0,5,5,1,0,0,0,0,0],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,0,0]
   ];
 
   const logSprite = [
@@ -135,63 +148,113 @@
     }
   }
 
-  function drawTipi(x, y) {
-    ctx.fillStyle = C_ACC3; 
+  // Scenery functions
+  function drawTipi(x, y, sil) {
+    ctx.fillStyle = sil ? C_BASE : C_ACC3; 
     ctx.beginPath(); ctx.moveTo(x+6, y); ctx.lineTo(x+12, y+10); ctx.lineTo(x, y+10); ctx.fill();
     ctx.fillStyle = C_BASE; 
     ctx.fillRect(x+5, y-2, 1, 3); ctx.fillRect(x+7, y-2, 1, 3);
     ctx.fillRect(x+5, y+6, 2, 4);
   }
   
-  function drawBuffalo(x, y) {
-    ctx.fillStyle = C_BASE;
+  function drawBuffalo(x, y, sil) {
+    ctx.fillStyle = sil ? C_BASE : C_ACC1;
     ctx.fillRect(x+2, y, 6, 4);   
     ctx.fillRect(x, y+2, 4, 4);   
     ctx.fillRect(x+2, y+4, 2, 4); 
     ctx.fillRect(x+6, y+4, 2, 4);
   }
   
-  function drawTreePatch(x, y) {
-    ctx.fillStyle = C_ACC2;
+  function drawTreePatch(x, y, sil, winter) {
+    ctx.fillStyle = sil ? C_BASE : (winter ? C_ACC3 : C_ACC2);
     ctx.fillRect(x+4, y, 8, 8);
     ctx.fillRect(x, y+4, 16, 6);
     ctx.fillStyle = C_BASE;
     ctx.fillRect(x+6, y+8, 4, 6); 
   }
+  
+  function drawShorelineRock(x, y, sil, winter) {
+    ctx.fillStyle = sil ? C_BASE : (winter ? C_SNOW : C_ACC3);
+    ctx.fillRect(x+2, y, 12, 8);
+    ctx.fillRect(x, y+4, 16, 6);
+    if (!sil && !winter) {
+      ctx.fillStyle = C_ACC2; 
+      ctx.fillRect(x+4, y+6, 6, 4);
+    }
+  }
 
   function drawScene() {
-    ctx.fillStyle = C_ACC3; 
+    let level = 1;
+    if (score >= 1000) level = 4;
+    else if (score >= 750) level = 3;
+    else if (score >= 500) level = 2;
+
+    const titles = {1: "MISKWA-KAMAW SIPIY", 2: "LAKE WINNIPEG", 3: "MIDNIGHT LAKE", 4: "WINTER TRAIL"};
+    if (titleDisplay.innerText !== titles[level]) titleDisplay.innerText = titles[level];
+
+    // Sky
+    if (level === 1 || level === 2) ctx.fillStyle = C_ACC3;
+    else if (level === 3) ctx.fillStyle = C_NIGHT;
+    else if (level === 4) ctx.fillStyle = C_ACC3;
     ctx.fillRect(0, 0, 160, 80);
 
-    ctx.fillStyle = C_SEC; 
+    // Dynamic Parallax Ground
+    if (level === 1) ctx.fillStyle = C_SEC;
+    else if (level === 2) ctx.fillStyle = C_ACC2;
+    else if (level === 3) ctx.fillStyle = C_BASE;
+    else if (level === 4) ctx.fillStyle = C_SNOW;
     ctx.fillRect(0, 20, 160, 16);
+    
     let grassOffset = (bgOffset * 0.3) % 40;
-    ctx.fillStyle = C_ACC2;
-    for(let i=-40; i<200; i+=20) {
-      ctx.fillRect(i - grassOffset, 22, 2, 4);
-      ctx.fillRect(i - grassOffset + 8, 26, 2, 3);
+    ctx.fillStyle = (level === 3 || level === 4) ? C_ACC3 : C_BASE;
+    if (level !== 4) {
+      for(let i=-40; i<200; i+=20) {
+        ctx.fillRect(i - grassOffset, 22, 2, 4);
+        ctx.fillRect(i - grassOffset + 8, 26, 2, 3);
+      }
     }
 
+    // Parallax Scenery
     let sceneOffset = (bgOffset * 0.4) % 240;
+    let sil = (level === 3);
+    let winter = (level === 4);
+    
     for(let i=-240; i<320; i+=240) {
-      drawTreePatch(i - sceneOffset + 20, 12);
-      drawBuffalo(i - sceneOffset + 70, 24);
-      drawBuffalo(i - sceneOffset + 85, 26);
-      drawTipi(i - sceneOffset + 130, 18);
-      drawTipi(i - sceneOffset + 145, 20);
-      drawTreePatch(i - sceneOffset + 190, 14);
+      if (level === 1) {
+        drawTreePatch(i - sceneOffset + 20, 12, false, false);
+        drawBuffalo(i - sceneOffset + 70, 24, false);
+        drawBuffalo(i - sceneOffset + 85, 26, false);
+        drawTipi(i - sceneOffset + 130, 18, false);
+        drawTipi(i - sceneOffset + 145, 20, false);
+        drawTreePatch(i - sceneOffset + 190, 14, false, false);
+      } else {
+        drawShorelineRock(i - sceneOffset + 10, 20, sil, winter);
+        drawTreePatch(i - sceneOffset + 40, 10, sil, winter);
+        drawShorelineRock(i - sceneOffset + 80, 22, sil, winter);
+        drawTreePatch(i - sceneOffset + 110, 12, sil, winter);
+        drawShorelineRock(i - sceneOffset + 160, 18, sil, winter);
+        drawTreePatch(i - sceneOffset + 200, 14, sil, winter);
+      }
     }
 
-    ctx.fillStyle = C_ACC1; 
+    // River / Track
+    if (level === 1) ctx.fillStyle = C_ACC1;
+    else if (level === 2 || level === 3) ctx.fillStyle = C_LAKE;
+    else if (level === 4) ctx.fillStyle = C_ACC3; // Ice path
     ctx.fillRect(0, 36, 160, 44);
 
-    ctx.fillStyle = C_ACC3; 
+    // Current Lines / Snow Tracks
+    if (level === 1) ctx.fillStyle = C_ACC3;
+    else if (level === 2 || level === 3) ctx.fillStyle = C_FOAM;
+    else if (level === 4) ctx.fillStyle = C_SNOW;
+    
     for(let i=0; i<6; i++) {
       ctx.fillRect((bgOffset + i*35) % 160, 42, 14, 2);
       ctx.fillRect(((bgOffset*1.1) + i*40 + 20) % 160, 56, 10, 2);
       ctx.fillRect(((bgOffset*1.2) + i*30 + 10) % 160, 70, 16, 2);
     }
 
+    // Draw Obstacles
     for(let i=0; i<obstacles.length; i++) {
       let obs = obstacles[i];
       let yPos = obs.lane === 0 ? 38 : (obs.lane === 1 ? 52 : 66);
@@ -201,27 +264,35 @@
         ctx.translate(obs.x + 5, yPos + 5);
         ctx.rotate(frame * 0.2); 
         ctx.translate(-(obs.x + 5), -(yPos + 5));
-        drawSprite(whirlSprite, obs.x, yPos, {5: C_ACC3});
+        let spinCol = winter ? C_SNOW : C_ACC3;
+        drawSprite(whirlSprite, obs.x, yPos, {5: spinCol});
         ctx.restore();
       } else {
-        let palette = obs.type === 'log' ? {4: C_ACC2, 5: C_ACC3} : {2: C_SEC, 5: C_ACC3};
+        let palette;
+        if (winter) {
+          palette = obs.type === 'log' ? {4: C_BASE, 5: C_SNOW} : {2: C_SNOW, 5: C_SNOW};
+        } else {
+          palette = obs.type === 'log' ? {4: C_ACC2, 5: C_ACC3} : {2: C_SEC, 5: C_ACC3};
+        }
         let sprite = obs.type === 'log' ? logSprite : rockSprite;
         drawSprite(sprite, obs.x, yPos, palette);
       }
     }
 
+    // Draw Player
     let playerY = playerLane === 0 ? 34 : (playerLane === 1 ? 48 : 62);
+    let pSprite = winter ? dogsledSprite : canoeSprite;
     
     if (isSpinning) {
       ctx.save();
       ctx.translate(29, playerY + 5); 
       ctx.rotate((60 - spinFrame) * 0.4); 
       ctx.translate(-29, -(playerY + 5));
-      drawSprite(canoeSprite, 15, playerY, {1: C_BASE, 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
+      drawSprite(pSprite, 15, playerY, {1: C_BASE, 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
       ctx.restore();
     } else {
-      let bob = (frame % 12 < 6) ? 1 : 0;
-      drawSprite(canoeSprite, 15, playerY + bob, {1: C_BASE, 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
+      let bob = (frame % 12 < 6 && !winter) ? 1 : 0;
+      drawSprite(pSprite, 15, playerY + bob, {1: C_BASE, 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
     }
   }
 
@@ -309,26 +380,19 @@
     msg.style.display = 'block';
   }
 
-  // --- NEW: Arcade Cabinet UI postMessage Listener ---
+  // Arcade Cabinet UI postMessage Listener
   window.addEventListener('message', function(event) {
     const command = event.data;
-    
-    if (command === 'DPAD_UP') {
-      movePlayer('up');
-    } else if (command === 'DPAD_DOWN') {
-      movePlayer('down');
-    } else if (command === 'BUTTON_A') {
-      // Start or Restart the game if not currently playing
-      if (!isPlaying) startGame();
-    }
+    if (command === 'DPAD_UP') movePlayer('up');
+    else if (command === 'DPAD_DOWN') movePlayer('down');
+    else if (command === 'BUTTON_A' && !isPlaying) startGame();
   });
 
-  // Fallback Start on screen tap just in case it's played outside the cabinet
+  // Fallback Start on screen tap
   document.getElementById('screen-container').addEventListener('click', () => {
     if(!isPlaying) startGame();
   });
 
-  // Initial render
   msg.style.display = 'block';
   drawScene();
 
