@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Miskwa-Kamaw Sipiy</title>
+<title>Red River Run</title>
 <style>
   body {
     margin: 0; padding: 0;
@@ -36,24 +36,53 @@
     width: 100%; height: 100%;
     display: block; image-rendering: pixelated;
   }
+  /* Overlay Screens */
+  .overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(14, 42, 30, 0.9); /* Dark Green translucent */
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    color: #fff; text-align: center; padding: 15px; box-sizing: border-box;
+    z-index: 10;
+  }
+  #intro-screen h2 {
+    color: #F7C844; margin: 0 0 10px 0; font-size: 18px; text-transform: uppercase;
+  }
+  #intro-screen p {
+    font-size: 11px; line-height: 1.4; margin: 0 0 15px 0; color: #D4D0C5;
+  }
+  .blink-text {
+    font-weight: bold; color: #12AEA2; font-size: 12px;
+    animation: blink 1s infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  
   #msg {
     position: absolute; top: 40%; left: 50%; transform: translateX(-50%);
-    font-weight: bold; color: #ffffff; background: #0E2A1E; 
+    font-weight: bold; color: #ffffff; background: #540E11; 
     font-size: 14px; padding: 6px 12px; display: none; white-space: nowrap;
-    border: 2px solid #F7C844; text-align: center;
+    border: 2px solid #F7C844; text-align: center; z-index: 10;
   }
 </style>
 </head>
 <body>
 <div id="game-container">
   <div id="header">
-    <span id="title-display">MISKWA-KAMAW SIPIY</span>
+    <span id="title-display">RED RIVER RUN</span>
     <span id="score-display">DIST: 0</span>
   </div>
   
   <div id="screen-container">
     <canvas id="gameCanvas" width="160" height="80"></canvas>
-    <div id="msg">PRESS 'A' TO START</div>
+    
+    <!-- New Intro Screen -->
+    <div id="intro-screen" class="overlay">
+      <h2>Red River Run</h2>
+      <p>Navigate the treacherous currents from the Red River valley, through the rocky shores of Lake Winnipeg, and into the frozen winter trails.<br><br>Use the D-PAD to dodge bright white debris and whirlpools!</p>
+      <div class="blink-text">PRESS 'A' TO START</div>
+    </div>
+    
+    <!-- Crash Screen -->
+    <div id="msg">CRASHED!<br><br>PRESS 'A' TO RESTART</div>
   </div>
 </div>
 
@@ -61,18 +90,19 @@
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
   const msg = document.getElementById('msg');
+  const introScreen = document.getElementById('intro-screen');
   const scoreDisplay = document.getElementById('score-display');
   const titleDisplay = document.getElementById('title-display');
   
-  // Custom Extended Palette
+  // Custom Extended Palette (Darkened Waters for Debris Contrast)
   const C_BASE = '#0E2A1E';  // Dark Green
   const C_SEC  = '#F7C844';  // Gold/Yellow
-  const C_ACC1 = '#540E11';  // Night Bordeaux (Dark Maroon River)
+  const C_ACC1 = '#3a090b';  // Darkened Red River
   const C_ACC2 = '#3D5948';  // Muted Green
   const C_ACC3 = '#D4D0C5';  // Beige/Hide
-  const C_LAKE = '#0F6F9E';  // Cornflower Ocean (Lake Winnipeg)
-  const C_FOAM = '#12AEA2';  // Light Sea Green (Lake Currents)
-  const C_NIGHT = '#2b1a3d'; // Purple Midnight
+  const C_LAKE = '#083B54';  // Darkened Lake Winnipeg
+  const C_FOAM = '#12AEA2';  // Light Sea Green 
+  const C_NIGHT = '#1a0f25'; // Darker Purple Midnight
   const C_SNOW = '#ffffff';  // Snow White
 
   let isPlaying = false, isGameOver = false;
@@ -148,7 +178,6 @@
     }
   }
 
-  // Scenery functions
   function drawTipi(x, y, sil) {
     ctx.fillStyle = sil ? C_BASE : C_ACC3; 
     ctx.beginPath(); ctx.moveTo(x+6, y); ctx.lineTo(x+12, y+10); ctx.lineTo(x, y+10); ctx.fill();
@@ -158,7 +187,7 @@
   }
   
   function drawBuffalo(x, y, sil) {
-    ctx.fillStyle = sil ? C_BASE : C_ACC1;
+    ctx.fillStyle = sil ? C_BASE : '#A83318';
     ctx.fillRect(x+2, y, 6, 4);   
     ctx.fillRect(x, y+2, 4, 4);   
     ctx.fillRect(x+2, y+4, 2, 4); 
@@ -184,12 +213,13 @@
   }
 
   function drawScene() {
+    // Lowered thresholds so players can actually experience the transitions
     let level = 1;
-    if (score >= 1000) level = 4;
-    else if (score >= 750) level = 3;
-    else if (score >= 500) level = 2;
+    if (score >= 750) level = 4;
+    else if (score >= 500) level = 3;
+    else if (score >= 250) level = 2;
 
-    const titles = {1: "MISKWA-KAMAW SIPIY", 2: "LAKE WINNIPEG", 3: "MIDNIGHT LAKE", 4: "WINTER TRAIL"};
+    const titles = {1: "RED RIVER RUN", 2: "LAKE WINNIPEG", 3: "MIDNIGHT LAKE", 4: "WINTER TRAIL"};
     if (titleDisplay.innerText !== titles[level]) titleDisplay.innerText = titles[level];
 
     // Sky
@@ -237,13 +267,13 @@
       }
     }
 
-    // River / Track
+    // River / Track (Darkened Colors)
     if (level === 1) ctx.fillStyle = C_ACC1;
     else if (level === 2 || level === 3) ctx.fillStyle = C_LAKE;
-    else if (level === 4) ctx.fillStyle = C_ACC3; // Ice path
+    else if (level === 4) ctx.fillStyle = C_ACC3; 
     ctx.fillRect(0, 36, 160, 44);
 
-    // Current Lines / Snow Tracks (Speed slowed by roughly half)
+    // Current Lines
     if (level === 1) ctx.fillStyle = C_ACC3;
     else if (level === 2 || level === 3) ctx.fillStyle = C_FOAM;
     else if (level === 4) ctx.fillStyle = C_SNOW;
@@ -254,7 +284,7 @@
       ctx.fillRect(((bgOffset * 0.6) + i*30 + 10) % 160, 70, 16, 2);
     }
 
-    // Draw Obstacles
+    // Draw Obstacles (High Contrast Bright Colors)
     for(let i=0; i<obstacles.length; i++) {
       let obs = obstacles[i];
       let yPos = obs.lane === 0 ? 38 : (obs.lane === 1 ? 52 : 66);
@@ -264,16 +294,11 @@
         ctx.translate(obs.x + 5, yPos + 5);
         ctx.rotate(frame * 0.2); 
         ctx.translate(-(obs.x + 5), -(yPos + 5));
-        let spinCol = winter ? C_SNOW : C_ACC3;
-        drawSprite(whirlSprite, obs.x, yPos, {5: spinCol});
+        drawSprite(whirlSprite, obs.x, yPos, {5: C_SNOW});
         ctx.restore();
       } else {
-        let palette;
-        if (winter) {
-          palette = obs.type === 'log' ? {4: C_BASE, 5: C_SNOW} : {2: C_SNOW, 5: C_SNOW};
-        } else {
-          palette = obs.type === 'log' ? {4: C_ACC2, 5: C_ACC3} : {2: C_SEC, 5: C_ACC3};
-        }
+        // Brighten logs and rocks so they stand out against dark water
+        let palette = obs.type === 'log' ? {4: C_ACC3, 5: C_SNOW} : {2: C_SEC, 5: C_SNOW};
         let sprite = obs.type === 'log' ? logSprite : rockSprite;
         drawSprite(sprite, obs.x, yPos, palette);
       }
@@ -288,11 +313,11 @@
       ctx.translate(29, playerY + 5); 
       ctx.rotate((60 - spinFrame) * 0.4); 
       ctx.translate(-29, -(playerY + 5));
-      drawSprite(pSprite, 15, playerY, {1: C_BASE, 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
+      drawSprite(pSprite, 15, playerY, {1: '#000000', 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
       ctx.restore();
     } else {
       let bob = (frame % 12 < 6 && !winter) ? 1 : 0;
-      drawSprite(pSprite, 15, playerY + bob, {1: C_BASE, 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
+      drawSprite(pSprite, 15, playerY + bob, {1: '#000000', 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
     }
   }
 
@@ -328,7 +353,7 @@
     
     bgOffset += speed;
     scoreDisplay.innerText = 'DIST: ' + score;
-    speed += 0.0015; 
+    speed += 0.0005; // Considerably slower acceleration curve so players can progress
 
     if (isSpinning) {
       spinFrame--;
@@ -369,6 +394,7 @@
     speed = 2.5;
     obstacles = [];
     playerLane = 1;
+    introScreen.style.display = 'none';
     msg.style.display = 'none';
     update();
   }
@@ -376,7 +402,6 @@
   function gameOver() {
     isPlaying = false;
     isGameOver = true;
-    msg.innerHTML = "CRASHED!<br><br>PRESS 'A' TO RESTART";
     msg.style.display = 'block';
   }
 
@@ -393,7 +418,7 @@
     if(!isPlaying) startGame();
   });
 
-  msg.style.display = 'block';
+  // Initial render (draws the scene behind the intro overlay)
   drawScene();
 
 </script>
