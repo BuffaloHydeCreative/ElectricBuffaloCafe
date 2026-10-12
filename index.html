@@ -1,299 +1,731 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Arcade Rhythm</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: transparent;
-            color: #ffffff;
-            font-family: 'Courier New', Courier, monospace;
-            overflow: hidden;
-            touch-action: none;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        #game-container {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-sizing: border-box;
-            padding: 10px;
-        }
-        canvas {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            background-color: #111; 
-            border: 6px solid #333; 
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            aspect-ratio: 3 / 2;
-        }
-    </style>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <title>Festival Arcade Mobile</title>
+
+  <style>
+
+    /* Global Reset & Base */
+
+    body { 
+
+      margin: 0; padding: 0; 
+
+      background: #000; 
+
+      color: #fff; 
+
+      font-family: 'Courier New', Courier, monospace; 
+
+      display: flex; justify-content: center; align-items: center;
+
+      height: 100vh; overflow: hidden;
+
+      touch-action: none; 
+
+    }
+
+
+
+    /* Main 9:16 Mobile Arcade Cabinet */
+
+    .arcade-machine {
+
+      width: 100%;
+
+      max-width: 450px;
+
+      aspect-ratio: 9/16;
+
+      max-height: 100vh;
+
+      background: #111;
+
+      border-radius: 20px;
+
+      border: 4px solid #333;
+
+      display: flex;
+
+      flex-direction: column;
+
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05);
+
+      position: relative;
+
+      overflow: hidden;
+
+    }
+
+
+
+    /* --- TOP HALF: CRT MONITOR --- */
+
+    .monitor-bezel {
+
+      flex: 0 0 50%;
+
+      background: #050505;
+
+      padding: 15px;
+
+      border-bottom: 4px solid #222;
+
+      box-sizing: border-box;
+
+      display: flex;
+
+      justify-content: center;
+
+      align-items: center;
+
+    }
+
+
+
+    .crt-screen {
+
+      width: 100%;
+
+      height: 100%;
+
+      background: #000;
+
+      border-radius: 12px;
+
+      position: relative;
+
+      overflow: hidden;
+
+      border: 6px solid #1a1a1a;
+
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
+
+    }
+
+
+
+    /* The DOS Style Menu Overlay */
+
+    #dos-menu {
+
+      position: absolute;
+
+      top: 0; left: 0; width: 100%; height: 100%;
+
+      background: #000;
+
+      color: #33ff33;
+
+      padding: 20px;
+
+      box-sizing: border-box;
+
+      display: flex;
+
+      flex-direction: column;
+
+      z-index: 10;
+
+    }
+
+
+
+    .dos-header {
+
+      font-weight: bold;
+
+      margin-bottom: 15px;
+
+      border-bottom: 2px dashed #33ff33;
+
+      padding-bottom: 5px;
+
+    }
+
+
+
+    .dos-list {
+
+      list-style: none;
+
+      padding: 0;
+
+      margin: 0;
+
+      display: flex;
+
+      flex-direction: column;
+
+      gap: 8px;
+
+    }
+
+
+
+    .dos-list li {
+
+      font-size: 14px;
+
+      text-transform: uppercase;
+
+      opacity: 0.5;
+
+    }
+
+
+
+    .dos-list li.active {
+
+      opacity: 1;
+
+      font-weight: bold;
+
+      background: #33ff33;
+
+      color: #000;
+
+    }
+
+
+
+    .dos-list li::before {
+
+      content: "  ";
+
+      white-space: pre;
+
+    }
+
+
+
+    .dos-list li.active::before {
+
+      content: "> ";
+
+    }
+
+
+
+    /* Game iFrame */
+
+    #arcade-frame {
+
+      width: 100%;
+
+      height: 100%;
+
+      border: none;
+
+      display: none;
+
+      position: absolute;
+
+      top: 0; left: 0;
+
+      z-index: 5;
+
+    }
+
+
+
+    /* CRT Scanline Overlay */
+
+    .crt-screen::after {
+
+      content: " ";
+
+      display: block;
+
+      position: absolute;
+
+      top: 0; left: 0; bottom: 0; right: 0;
+
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+
+      z-index: 20;
+
+      background-size: 100% 3px, 3px 100%;
+
+      pointer-events: none;
+
+      box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+
+    }
+
+
+
+    /* --- BOTTOM HALF: CONTROL PAD --- */
+
+    .control-deck {
+
+      flex: 1;
+
+      background: #1e1e1e;
+
+      position: relative;
+
+      padding: 20px;
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+    }
+
+
+
+    /* D-Pad (Left Side) */
+
+    .d-pad-container {
+
+      width: 120px;
+
+      height: 120px;
+
+      position: relative;
+
+    }
+
+    
+
+    .d-pad-btn {
+
+      position: absolute;
+
+      background: #333;
+
+      border: 4px solid #111;
+
+      border-radius: 4px;
+
+      cursor: pointer;
+
+      box-shadow: 0 4px 0 #000;
+
+    }
+
+
+
+    .d-pad-btn:active {
+
+      transform: translateY(4px);
+
+      box-shadow: 0 0 0 #000;
+
+      background: #444;
+
+    }
+
+
+
+    .d-up { top: 0; left: 40px; width: 40px; height: 45px; border-bottom: none; border-radius: 8px 8px 0 0; }
+
+    .d-down { bottom: 0; left: 40px; width: 40px; height: 45px; border-top: none; border-radius: 0 0 8px 8px; }
+
+    .d-left { top: 40px; left: 0; width: 45px; height: 40px; border-right: none; border-radius: 8px 0 0 8px; }
+
+    .d-right { top: 40px; right: 0; width: 45px; height: 40px; border-left: none; border-radius: 0 8px 8px 0; }
+
+    .d-center { top: 40px; left: 40px; width: 40px; height: 40px; background: #333; border: none; }
+
+
+
+    /* Center Home Button */
+
+    .home-container {
+
+      display: flex;
+
+      flex-direction: column;
+
+      align-items: center;
+
+      gap: 5px;
+
+      margin-top: 40px;
+
+    }
+
+
+
+    .home-btn {
+
+      width: 45px;
+
+      height: 20px;
+
+      background: #555;
+
+      border-radius: 10px;
+
+      border: 3px solid #111;
+
+      cursor: pointer;
+
+      box-shadow: 0 4px 0 #000;
+
+    }
+
+
+
+    .home-btn:active {
+
+      transform: translateY(4px);
+
+      box-shadow: 0 0 0 #000;
+
+    }
+
+
+
+    .home-label {
+
+      font-size: 10px;
+
+      font-weight: bold;
+
+      color: #888;
+
+      letter-spacing: 1px;
+
+    }
+
+
+
+    /* Action Buttons (Right Side) */
+
+    .action-container {
+
+      display: flex;
+
+      gap: 15px;
+
+      transform: rotate(-15deg); 
+
+    }
+
+
+
+    .action-btn-wrapper {
+
+      display: flex;
+
+      flex-direction: column;
+
+      align-items: center;
+
+      gap: 8px;
+
+    }
+
+
+
+    .action-btn {
+
+      width: 50px;
+
+      height: 50px;
+
+      border-radius: 50%;
+
+      border: 4px solid #111;
+
+      cursor: pointer;
+
+      box-shadow: 0 6px 0 #000;
+
+    }
+
+
+
+    .action-btn:active {
+
+      transform: translateY(6px);
+
+      box-shadow: 0 0 0 #000;
+
+    }
+
+
+
+    .btn-b { background: #ffcc00; margin-top: 25px; }
+
+    .btn-a { background: #e60000; }
+
+
+
+    .btn-label {
+
+      font-size: 12px;
+
+      font-weight: bold;
+
+      color: #888;
+
+      white-space: nowrap;
+
+    }
+
+  </style>
+
 </head>
+
 <body>
 
-    <div id="game-container">
-        <canvas id="gameCanvas" width="600" height="400"></canvas>
+
+
+  <div class="arcade-machine">
+
+    
+
+    <!-- CRT MONITOR -->
+
+    <div class="monitor-bezel">
+
+      <div class="crt-screen">
+
+        
+
+        <!-- OS Menu -->
+
+        <div id="dos-menu">
+
+          <div class="dos-header">FESTIVAL_OS.EXE<br>MEM OK...</div>
+
+          <ul class="dos-list" id="game-list">
+
+            <li class="active">game1.html</li>
+
+            <li>game2.html</li>
+
+            <li>game3.html</li>
+
+            <li>game4.html</li>
+
+            <li>game5.html</li>
+
+            <li>game6.html</li>
+
+            <li>game7.html</li>
+
+          </ul>
+
+        </div>
+
+
+
+        <!-- The Game Player -->
+
+        <iframe id="arcade-frame" title="Game Screen"></iframe>
+
+      </div>
+
     </div>
 
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
 
-        // Core Game Variables
-        let gameState = 'START';
-        let score = 0, combo = 0, maxCombo = 0, frame = 0;
-        let notes = [];
-        let hitFeedback = [];
-        const HIT_X = 100;
-        const NOTE_SPEED = 4;
-        const HIT_TOLERANCE = 30; // Pixel distance for a valid hit
 
-        // Theme Palette
-        const C_BG = '#111111';
-        const C_TRACK = '#222222';
-        const C_HITLINE = '#ffffff';
-        const LANE_COLORS = ['#2ed573', '#ff4757', '#ffcc00', '#1e90ff']; // Up (Green), Down (Red), B (Yellow), A (Blue)
-        const LANE_LABELS = ['UP', 'DOWN', 'B', 'A'];
+    <!-- CONTROL PAD -->
 
-        // Lane Layout (Y-coordinates)
-        const lanes = [100, 160, 220, 280]; 
+    <div class="control-deck">
 
-        // ---------------------------------------------------------
-        // SIGNAL BRIDGE: Listens to index.html Arcade Controls
-        // ---------------------------------------------------------
-        window.addEventListener('message', function(event) {
-            const cmd = event.data;
-            
-            // Menu State Logic
-            if (gameState === 'START' || gameState === 'GAME_OVER') {
-                if (cmd === 'BUTTON_A') startGame();
-                return;
-            }
+      
 
-            // Gameplay State Logic
-            if (gameState === 'PLAYING') {
-                if (cmd === 'DPAD_UP') attemptHit(0);
-                if (cmd === 'DPAD_DOWN') attemptHit(1);
-                if (cmd === 'BUTTON_B') attemptHit(2);
-                if (cmd === 'BUTTON_A') attemptHit(3);
-            }
-        });
+      <!-- Directional Pad -->
 
-        // ---------------------------------------------------------
-        // GAME LOGIC
-        // ---------------------------------------------------------
-        function startGame() {
-            score = 0;
-            combo = 0;
-            maxCombo = 0;
-            frame = 0;
-            notes = [];
-            hitFeedback = [];
-            gameState = 'PLAYING';
+      <div class="d-pad-container">
+
+        <div class="d-pad-btn d-up" onclick="pressDpad('DPAD_UP')"></div>
+
+        <div class="d-pad-btn d-right" onclick="pressDpad('DPAD_RIGHT')"></div>
+
+        <div class="d-pad-btn d-down" onclick="pressDpad('DPAD_DOWN')"></div>
+
+        <div class="d-pad-btn d-left" onclick="pressDpad('DPAD_LEFT')"></div>
+
+        <div class="d-center"></div>
+
+      </div>
+
+
+
+      <!-- Center Home Button -->
+
+      <div class="home-container">
+
+        <div class="home-btn" onclick="btnHome()"></div>
+
+        <span class="home-label">HOME</span>
+
+      </div>
+
+
+
+      <!-- Action Buttons -->
+
+      <div class="action-container">
+
+        <div class="action-btn-wrapper">
+
+          <div class="action-btn btn-b" onclick="btnAction('BUTTON_B')"></div>
+
+          <span class="btn-label">BUTTON B</span>
+
+        </div>
+
+        <div class="action-btn-wrapper">
+
+          <div class="action-btn btn-a" onclick="btnAction('BUTTON_A')"></div>
+
+          <span class="btn-label">BUTTON A</span>
+
+        </div>
+
+      </div>
+
+
+
+    </div>
+
+
+
+  </div>
+
+
+
+  <script>
+
+    let currentIndex = 0;
+
+    const games = [
+
+      'game1.html', 'game2.html', 'game3.html', 
+
+      'game4.html', 'game5.html', 'game6.html', 'game7.html'
+
+    ];
+
+    let isPlaying = false;
+
+
+
+    const listItems = document.querySelectorAll('#game-list li');
+
+    const dosMenu = document.getElementById('dos-menu');
+
+    const gameFrame = document.getElementById('arcade-frame');
+
+
+
+    // Helper: Broadcasts signal to the iframe
+
+    function sendSignal(command) {
+
+      if (isPlaying) {
+
+        gameFrame.contentWindow.postMessage(command, '*');
+
+      }
+
+    }
+
+
+
+    // D-Pad Control
+
+    function pressDpad(directionStr) {
+
+      if (isPlaying) {
+
+        sendSignal(directionStr);
+
+      } else {
+
+        if (directionStr === 'DPAD_UP') moveMenu(-1);
+
+        if (directionStr === 'DPAD_DOWN') moveMenu(1);
+
+      }
+
+    }
+
+
+
+    function moveMenu(direction) {
+
+      listItems[currentIndex].classList.remove('active');
+
+      currentIndex += direction;
+
+      if (currentIndex < 0) currentIndex = games.length - 1;
+
+      if (currentIndex >= games.length) currentIndex = 0;
+
+      listItems[currentIndex].classList.add('active');
+
+    }
+
+
+
+    // Action Buttons
+
+    function btnAction(buttonStr) {
+
+      if (isPlaying) {
+
+        sendSignal(buttonStr);
+
+      } else {
+
+        if (buttonStr === 'BUTTON_A') {
+
+          dosMenu.style.display = 'none';
+
+          gameFrame.style.display = 'block';
+
+          gameFrame.src = games[currentIndex];
+
+          isPlaying = true;
+
         }
 
-        function spawnNote() {
-            // Spawn a note randomly every ~60 frames
-            if (frame % 60 === 0 && Math.random() > 0.2) {
-                const targetLane = Math.floor(Math.random() * 4);
-                notes.push({
-                    x: canvas.width + 20,
-                    lane: targetLane,
-                    hit: false,
-                    missed: false
-                });
-            }
-        }
+      }
 
-        function attemptHit(laneIndex) {
-            // Find the closest un-hit note in the corresponding lane
-            let closestNote = null;
-            let minDistance = Infinity;
+    }
 
-            for (let i = 0; i < notes.length; i++) {
-                let n = notes[i];
-                if (n.lane === laneIndex && !n.hit && !n.missed) {
-                    let dist = Math.abs(n.x - HIT_X);
-                    if (dist < minDistance) {
-                        minDistance = dist;
-                        closestNote = n;
-                    }
-                }
-            }
 
-            // Check if within strike tolerance
-            if (closestNote && minDistance <= HIT_TOLERANCE) {
-                closestNote.hit = true;
-                score += 100 + (combo * 10);
-                combo++;
-                if (combo > maxCombo) maxCombo = combo;
-                
-                let feedbackText = minDistance < 10 ? "PERFECT" : "GOOD";
-                spawnFeedback(feedbackText, LANE_COLORS[laneIndex], lanes[laneIndex]);
-            } else {
-                // Pressed a button with no note in the strike zone
-                missBeat(laneIndex);
-            }
-        }
 
-        function missBeat(laneIndex) {
-            combo = 0;
-            spawnFeedback("MISS", "#555", lanes[laneIndex]);
-        }
+    // Home Button
 
-        function spawnFeedback(text, color, yPos) {
-            hitFeedback.push({ text: text, color: color, y: yPos, x: HIT_X, life: 1.0 });
-        }
+    function btnHome() {
 
-        function update() {
-            if (gameState !== 'PLAYING') return;
+      if (isPlaying) {
 
-            spawnNote();
+        gameFrame.src = ""; // Unload game to save memory
 
-            // Move notes
-            for (let i = notes.length - 1; i >= 0; i--) {
-                let n = notes[i];
-                if (!n.hit) {
-                    n.x -= NOTE_SPEED;
-                    
-                    // Check if passed the hit zone without being struck
-                    if (n.x < HIT_X - HIT_TOLERANCE && !n.missed) {
-                        n.missed = true;
-                        missBeat(n.lane);
-                    }
-                }
-                
-                // Cleanup old notes
-                if (n.x < -50 || n.hit) {
-                    notes.splice(i, 1);
-                }
-            }
+        gameFrame.style.display = 'none';
 
-            // Update floating feedback text
-            for (let i = hitFeedback.length - 1; i >= 0; i--) {
-                let f = hitFeedback[i];
-                f.y -= 1;
-                f.life -= 0.02;
-                if (f.life <= 0) hitFeedback.splice(i, 1);
-            }
+        dosMenu.style.display = 'flex';
 
-            frame++;
-            
-            // Auto-end game for testing (e.g., after 2000 frames)
-            if (frame > 2000) gameState = 'GAME_OVER';
-        }
+        isPlaying = false;
 
-        // ---------------------------------------------------------
-        // RENDERING
-        // ---------------------------------------------------------
-        function draw() {
-            // Background
-            ctx.fillStyle = C_BG;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
-            if (gameState === 'START') {
-                ctx.fillStyle = LANE_COLORS[3];
-                ctx.font = 'bold 40px Courier New';
-                ctx.textAlign = 'center';
-                ctx.fillText("FESTIVAL RHYTHM", canvas.width/2, canvas.height/2 - 20);
-                
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 18px Courier New';
-                ctx.fillText("PRESS 'A' TO START", canvas.width/2, canvas.height/2 + 30);
-                return;
-            }
+    }
 
-            if (gameState === 'GAME_OVER') {
-                ctx.fillStyle = '#ff4757';
-                ctx.font = 'bold 40px Courier New';
-                ctx.textAlign = 'center';
-                ctx.fillText("TRACK COMPLETE", canvas.width/2, canvas.height/2 - 40);
-                
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 20px Courier New';
-                ctx.fillText(`Final Score: ${score}`, canvas.width/2, canvas.height/2 + 10);
-                ctx.fillText(`Max Combo: ${maxCombo}`, canvas.width/2, canvas.height/2 + 40);
-                
-                ctx.fillStyle = LANE_COLORS[3];
-                ctx.font = 'bold 16px Courier New';
-                ctx.fillText("PRESS 'A' TO REPLAY", canvas.width/2, canvas.height/2 + 90);
-                return;
-            }
+  </script>
 
-            // Draw Lanes
-            for (let i = 0; i < 4; i++) {
-                ctx.fillStyle = C_TRACK;
-                ctx.fillRect(0, lanes[i] - 25, canvas.width, 50);
-                
-                // Lane Label
-                ctx.fillStyle = '#555';
-                ctx.font = 'bold 14px Courier New';
-                ctx.textAlign = 'left';
-                ctx.fillText(LANE_LABELS[i], 10, lanes[i] + 5);
-            }
 
-            // Draw Strike Line / Hit Zone
-            ctx.strokeStyle = C_HITLINE;
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(HIT_X, 60);
-            ctx.lineTo(HIT_X, 320);
-            ctx.stroke();
 
-            // Draw Hit Receptacles
-            for (let i = 0; i < 4; i++) {
-                ctx.strokeStyle = LANE_COLORS[i];
-                ctx.lineWidth = 3;
-                ctx.strokeRect(HIT_X - 15, lanes[i] - 15, 30, 30);
-            }
-
-            // Draw Scrolling Notes
-            for (let n of notes) {
-                if (!n.hit && !n.missed) {
-                    ctx.fillStyle = LANE_COLORS[n.lane];
-                    ctx.fillRect(n.x - 10, lanes[n.lane] - 10, 20, 20);
-                }
-            }
-
-            // UI Overlay (Score & Combo)
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 20px Courier New';
-            ctx.textAlign = 'left';
-            ctx.fillText(`SCORE: ${score}`, 20, 40);
-            ctx.textAlign = 'right';
-            ctx.fillStyle = combo > 10 ? '#ffcc00' : '#ffffff';
-            ctx.fillText(`COMBO: ${combo}`, canvas.width - 20, 40);
-
-            // Draw Feedback Text (Perfect, Good, Miss)
-            ctx.textAlign = 'center';
-            ctx.font = 'bold 16px Courier New';
-            for (let f of hitFeedback) {
-                ctx.fillStyle = f.color;
-                ctx.globalAlpha = Math.max(0, f.life);
-                ctx.fillText(f.text, f.x, f.y - 20);
-                ctx.globalAlpha = 1.0;
-            }
-        }
-
-        // Main Game Loop
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-
-        // Boot
-        requestAnimationFrame(gameLoop);
-    </script>
 </body>
-</html>
+
+</html> 
