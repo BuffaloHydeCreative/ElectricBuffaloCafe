@@ -1,401 +1,408 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Miskwa-Kamaw Sipiy</title>
-<style>
-  body {
-    margin: 0; padding: 0;
-    background: transparent;
-    display: flex; justify-content: center; align-items: center;
-    height: 100vh; width: 100vw;
-    font-family: 'Courier New', Courier, monospace;
-    user-select: none; touch-action: manipulation; overflow: hidden;
-  }
-  #game-container {
-    width: 100%; height: 100%; max-width: 500px;
-    display: flex; flex-direction: column; justify-content: center;
-    box-sizing: border-box; padding: 10px;
-    background: transparent; 
-  }
-  #header {
-    flex: 0 0 auto; display: flex; justify-content: space-between;
-    color: #F7C844; font-weight: bold; margin-bottom: 10px;
-    border-bottom: 2px solid #3D5948; padding-bottom: 5px;
-    font-size: 14px; text-transform: uppercase;
-  }
-  #screen-container {
-    flex: 0 0 auto; width: 100%;
-    aspect-ratio: 2 / 1; 
-    border: 4px solid #D4D0C5; 
-    position: relative; background: transparent;
-    overflow: hidden; box-sizing: border-box;
-  }
-  canvas {
-    width: 100%; height: 100%;
-    display: block; image-rendering: pixelated;
-  }
-  #msg {
-    position: absolute; top: 40%; left: 50%; transform: translateX(-50%);
-    font-weight: bold; color: #ffffff; background: #0E2A1E; 
-    font-size: 14px; padding: 6px 12px; display: none; white-space: nowrap;
-    border: 2px solid #F7C844; text-align: center;
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Festival Arcade Mobile</title>
+  <style>
+    /* Global Reset & Base */
+    body { 
+      margin: 0; padding: 0; 
+      background: #000; 
+      color: #fff; 
+      font-family: 'Courier New', Courier, monospace; 
+      display: flex; justify-content: center; align-items: center;
+      height: 100vh; width: 100vw;
+      overflow: hidden;
+      touch-action: none; 
+    }
+
+    /* Main Mobile Arcade Cabinet */
+    .arcade-machine {
+      width: 100%;
+      max-width: 450px;
+      height: 100%;
+      max-height: 100vh;
+      background: #0d0d0d;
+      border-radius: 20px;
+      border: 4px solid #333;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05);
+      position: relative;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    /* --- SECTION 1: CRT MONITOR (Dynamic Flex Height) --- */
+    .monitor-bezel {
+      flex: 1; /* Automatically takes all remaining vertical space */
+      min-height: 250px; /* Ensures the screen never gets too squished */
+      background: linear-gradient(to bottom, #000 0%, #151515 100%);
+      padding: 15px 15px 5px 15px;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      box-shadow: inset 0 25px 35px rgba(0,0,0,0.9), inset 0 -5px 10px rgba(255,255,255,0.05);
+    }
+
+    .crt-screen {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      border: 6px solid #1a1a1a;
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
+    }
+
+    /* The DOS Style Menu Overlay */
+    #dos-menu {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: #000;
+      color: #33ff33;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+
+    .dos-header {
+      font-weight: bold;
+      margin-bottom: 15px;
+      border-bottom: 2px dashed #33ff33;
+      padding-bottom: 5px;
+    }
+
+    .dos-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .dos-list li {
+      font-size: 14px;
+      text-transform: uppercase;
+      opacity: 0.5;
+    }
+
+    .dos-list li.active {
+      opacity: 1;
+      font-weight: bold;
+      background: #33ff33;
+      color: #000;
+    }
+
+    .dos-list li::before {
+      content: "  ";
+      white-space: pre;
+    }
+
+    .dos-list li.active::before {
+      content: "> ";
+    }
+
+    /* Game iFrame */
+    #arcade-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: none;
+      position: absolute;
+      top: 0; left: 0;
+      z-index: 5;
+    }
+
+    /* CRT Scanline Overlay */
+    .crt-screen::after {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+      z-index: 20;
+      background-size: 100% 3px, 3px 100%;
+      pointer-events: none;
+      box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+    }
+
+    /* --- SECTION 2: CONTROL DECK (Fixed Height) --- */
+    .control-deck {
+      flex: 0 0 160px; /* Locked height so controls never disappear */
+      background: linear-gradient(to bottom, #2b2b2b 0%, #1a1a1a 15%, #111 100%);
+      border-top: 3px solid #666; 
+      border-bottom: 8px solid #000; 
+      box-shadow: 0 15px 25px rgba(0,0,0,0.9); 
+      position: relative;
+      padding: 0 25px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 5;
+      box-sizing: border-box;
+    }
+
+    /* Digital Joystick */
+    .joystick-base {
+      width: 120px;
+      height: 120px;
+      background: radial-gradient(circle, #1a1a1a 30%, #2a2a2a 100%);
+      border-radius: 50%;
+      border: 4px solid #050505;
+      box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 2px 5px rgba(255,255,255,0.1);
+      position: relative;
+    }
+
+    .j-dir {
+      position: absolute;
+      z-index: 2;
+      cursor: pointer;
+    }
+    .j-up { top: 0; left: 30px; width: 60px; height: 60px; border-radius: 30px 30px 0 0; }
+    .j-down { bottom: 0; left: 30px; width: 60px; height: 60px; border-radius: 0 0 30px 30px; }
+    .j-left { top: 30px; left: 0; width: 60px; height: 60px; border-radius: 30px 0 0 30px; }
+    .j-right { top: 30px; right: 0; width: 60px; height: 60px; border-radius: 0 30px 30px 0; }
+
+    /* The Stick Itself */
+    .joystick-stick {
+      width: 65px; 
+      height: 65px;
+      background: radial-gradient(circle at 35% 35%, #888, #222);
+      border-radius: 50%;
+      position: absolute;
+      top: 27.5px; left: 27.5px; 
+      box-shadow: 8px 12px 15px rgba(0,0,0,0.6), inset -5px -5px 15px rgba(0,0,0,0.7);
+      pointer-events: none;
+      transition: transform 0.05s ease-out;
+      z-index: 1;
+    }
+
+    .j-up:active ~ .joystick-stick { transform: translateY(-12px); box-shadow: 8px 25px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    .j-down:active ~ .joystick-stick { transform: translateY(12px); box-shadow: 8px 0px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    .j-left:active ~ .joystick-stick { transform: translateX(-12px); box-shadow: 20px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    .j-right:active ~ .joystick-stick { transform: translateX(12px); box-shadow: -5px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+
+    /* Concave Action Buttons */
+    .action-container {
+      display: flex;
+      gap: 15px;
+      transform: rotate(-15deg); 
+    }
+
+    .action-btn-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .action-btn {
+      width: 55px;
+      height: 55px;
+      border-radius: 50%;
+      border: 3px solid #111;
+      cursor: pointer;
+      position: relative;
+      box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 6px 0 #050505, 0 10px 15px rgba(0,0,0,0.6);
+    }
+    
+    .action-btn::after {
+      content: '';
+      position: absolute;
+      top: 4px; left: 10px; right: 10px; height: 18px;
+      background: linear-gradient(rgba(255,255,255,0.25), transparent);
+      border-radius: 20px 20px 0 0;
+      pointer-events: none;
+    }
+
+    .action-btn:active {
+      transform: translateY(6px);
+      box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 0 0 #050505, 0 4px 6px rgba(0,0,0,0.6);
+    }
+
+    .btn-b { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #e0a800; margin-top: 25px; }
+    .btn-a { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #cc0000; }
+
+    .btn-label {
+      font-size: 12px;
+      font-weight: bold;
+      color: #777;
+    }
+
+    /* --- SECTION 3: FRONT PANEL (Fixed Height) --- */
+    .front-panel {
+      flex: 0 0 90px; /* Locked height to guarantee coin door fits */
+      background: linear-gradient(to bottom, #050505 0%, #111 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      z-index: 4; 
+    }
+
+    /* 90s Coin Insert Plate */
+    .coin-door {
+      background: #1a1a1a;
+      border: 3px solid #000;
+      border-radius: 6px;
+      padding: 10px 15px;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 2px 4px rgba(255,255,255,0.05);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .coin-btn {
+      width: 45px;
+      height: 60px;
+      background: rgba(230, 60, 20, 0.85);
+      border: 3px solid #050505;
+      border-radius: 6px;
+      cursor: pointer;
+      box-shadow: inset 0 0 12px rgba(255,180,100,0.6), inset 0 0 4px rgba(0,0,0,0.8), 0 4px 0 #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .coin-btn:active {
+      transform: translateY(4px);
+      box-shadow: inset 0 0 12px rgba(255,180,100,0.6), inset 0 0 4px rgba(0,0,0,0.8), 0 0 0 #000;
+    }
+
+    .coin-text {
+      font-family: Arial, sans-serif;
+      font-weight: 900; 
+      font-size: 8px;
+      color: rgba(255, 255, 255, 0.95);
+      text-shadow: 0 0 4px rgba(255,255,255,0.6);
+      line-height: 1.2;
+    }
+  </style>
 </head>
 <body>
-<div id="game-container">
-  <div id="header">
-    <span id="title-display">MISKWA-KAMAW SIPIY</span>
-    <span id="score-display">DIST: 0</span>
+
+  <div class="arcade-machine">
+    
+    <!-- 1. CRT MONITOR -->
+    <div class="monitor-bezel">
+      <div class="crt-screen">
+        <div id="dos-menu">
+          <div class="dos-header">FESTIVAL_OS.EXE<br>MEM OK...</div>
+          <ul class="dos-list" id="game-list">
+            <li class="active">game1.html</li>
+            <li>game2.html</li>
+            <li>game3.html</li>
+            <li>game4.html</li>
+            <li>game5.html</li>
+            <li>game6.html</li>
+            <li>game7.html</li>
+          </ul>
+        </div>
+        <iframe id="arcade-frame" title="Game Screen"></iframe>
+      </div>
+    </div>
+
+    <!-- 2. CONTROL DECK -->
+    <div class="control-deck">
+      <div class="joystick-base">
+        <div class="j-dir j-up" onmousedown="pressDpad('DPAD_UP')" ontouchstart="pressDpad('DPAD_UP')"></div>
+        <div class="j-dir j-right" onmousedown="pressDpad('DPAD_RIGHT')" ontouchstart="pressDpad('DPAD_RIGHT')"></div>
+        <div class="j-dir j-down" onmousedown="pressDpad('DPAD_DOWN')" ontouchstart="pressDpad('DPAD_DOWN')"></div>
+        <div class="j-dir j-left" onmousedown="pressDpad('DPAD_LEFT')" ontouchstart="pressDpad('DPAD_LEFT')"></div>
+        <div class="joystick-stick"></div>
+      </div>
+
+      <div class="action-container">
+        <div class="action-btn-wrapper">
+          <div class="action-btn btn-b" onclick="btnAction('BUTTON_B')"></div>
+          <span class="btn-label">B</span>
+        </div>
+        <div class="action-btn-wrapper">
+          <div class="action-btn btn-a" onclick="btnAction('BUTTON_A')"></div>
+          <span class="btn-label">A</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. FRONT PANEL -->
+    <div class="front-panel">
+      <div class="coin-door">
+        <div class="coin-btn" onclick="btnHome()">
+          <span class="coin-text">INSERT<br>COIN</span>
+        </div>
+      </div>
+    </div>
+
   </div>
-  
-  <div id="screen-container">
-    <canvas id="gameCanvas" width="160" height="80"></canvas>
-    <div id="msg">PRESS 'A' TO START</div>
-  </div>
-</div>
 
-<script>
-  const cvs = document.getElementById('gameCanvas');
-  const ctx = cvs.getContext('2d');
-  const msg = document.getElementById('msg');
-  const scoreDisplay = document.getElementById('score-display');
-  const titleDisplay = document.getElementById('title-display');
-  
-  // Custom Extended Palette
-  const C_BASE = '#0E2A1E';  // Dark Green
-  const C_SEC  = '#F7C844';  // Gold/Yellow
-  const C_ACC1 = '#540E11';  // Night Bordeaux (Dark Maroon River)
-  const C_ACC2 = '#3D5948';  // Muted Green
-  const C_ACC3 = '#D4D0C5';  // Beige/Hide
-  const C_LAKE = '#0F6F9E';  // Cornflower Ocean (Lake Winnipeg)
-  const C_FOAM = '#12AEA2';  // Light Sea Green (Lake Currents)
-  const C_NIGHT = '#2b1a3d'; // Purple Midnight
-  const C_SNOW = '#ffffff';  // Snow White
+  <script>
+    let currentIndex = 0;
+    const games = [
+      'game1.html', 'game2.html', 'game3.html', 
+      'game4.html', 'game5.html', 'game6.html', 'game7.html'
+    ];
+    let isPlaying = false;
 
-  let isPlaying = false, isGameOver = false;
-  let score = 0, frame = 0, speed = 2.5;
-  let bgOffset = 0;
-  
-  // Player State
-  let playerLane = 1; 
-  let returnTimer = null;
-  let isSpinning = false;
-  let spinFrame = 0;
-  
-  let obstacles = [];
+    const listItems = document.querySelectorAll('#game-list li');
+    const dosMenu = document.getElementById('dos-menu');
+    const gameFrame = document.getElementById('arcade-frame');
 
-  const canoeSprite = [
-    [0,0,0,0,0,1,1,0,0,0,0,0,0,0],
-    [0,0,0,0,0,5,5,5,0,0,0,0,0,0],
-    [0,0,0,0,0,5,5,4,0,0,0,0,0,0],
-    [0,2,2,2,2,2,2,2,2,2,2,2,2,0],
-    [0,0,2,2,2,2,2,2,2,2,2,2,0,0]
-  ];
-
-  const dogsledSprite = [
-    [0,0,0,0,0,0,0,1,1,0,0,0,0,0,0],
-    [0,0,0,0,0,0,0,5,5,5,0,0,0,0,0],
-    [0,0,0,0,0,0,0,5,5,1,0,0,0,0,0],
-    [0,2,2,0,2,2,0,5,5,1,0,0,0,0,0],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,0,0]
-  ];
-
-  const logSprite = [
-    [0,5,5,5,5,5,0],
-    [5,4,4,4,4,4,5],
-    [0,5,5,5,5,5,0]
-  ];
-  
-  const rockSprite = [
-    [0,0,5,5,0],
-    [0,5,2,2,5],
-    [5,5,5,5,5]
-  ];
-
-  const whirlSprite = [
-    [0,5,5,5,0],
-    [5,0,0,0,5],
-    [5,0,5,0,5],
-    [5,0,0,0,5],
-    [0,5,5,5,0]
-  ];
-
-  function drawSprite(sprite, x, y, paletteMap) {
-    for(let r=0; r<sprite.length; r++) {
-      for(let c=0; c<sprite[r].length; c++) {
-        let val = sprite[r][c];
-        if(val !== 0) {
-          ctx.fillStyle = paletteMap[val];
-          ctx.fillRect(x + c*2, y + r*2, 2, 2); 
-        }
-      }
-    }
-  }
-
-  function spawnObstacle() {
-    if(frame % Math.max(35, 90 - Math.floor(score/100)) === 0) {
-      let lane = Math.floor(Math.random() * 3);
-      let rand = Math.random();
-      let type = 'log';
-      
-      if(rand > 0.85) type = 'whirlpool';
-      else if(rand > 0.40) type = 'rock';
-
-      obstacles.push({ x: 170, lane: lane, type: type, passed: false, hit: false });
-    }
-  }
-
-  // Scenery functions
-  function drawTipi(x, y, sil) {
-    ctx.fillStyle = sil ? C_BASE : C_ACC3; 
-    ctx.beginPath(); ctx.moveTo(x+6, y); ctx.lineTo(x+12, y+10); ctx.lineTo(x, y+10); ctx.fill();
-    ctx.fillStyle = C_BASE; 
-    ctx.fillRect(x+5, y-2, 1, 3); ctx.fillRect(x+7, y-2, 1, 3);
-    ctx.fillRect(x+5, y+6, 2, 4);
-  }
-  
-  function drawBuffalo(x, y, sil) {
-    ctx.fillStyle = sil ? C_BASE : C_ACC1;
-    ctx.fillRect(x+2, y, 6, 4);   
-    ctx.fillRect(x, y+2, 4, 4);   
-    ctx.fillRect(x+2, y+4, 2, 4); 
-    ctx.fillRect(x+6, y+4, 2, 4);
-  }
-  
-  function drawTreePatch(x, y, sil, winter) {
-    ctx.fillStyle = sil ? C_BASE : (winter ? C_ACC3 : C_ACC2);
-    ctx.fillRect(x+4, y, 8, 8);
-    ctx.fillRect(x, y+4, 16, 6);
-    ctx.fillStyle = C_BASE;
-    ctx.fillRect(x+6, y+8, 4, 6); 
-  }
-  
-  function drawShorelineRock(x, y, sil, winter) {
-    ctx.fillStyle = sil ? C_BASE : (winter ? C_SNOW : C_ACC3);
-    ctx.fillRect(x+2, y, 12, 8);
-    ctx.fillRect(x, y+4, 16, 6);
-    if (!sil && !winter) {
-      ctx.fillStyle = C_ACC2; 
-      ctx.fillRect(x+4, y+6, 6, 4);
-    }
-  }
-
-  function drawScene() {
-    let level = 1;
-    if (score >= 1000) level = 4;
-    else if (score >= 750) level = 3;
-    else if (score >= 500) level = 2;
-
-    const titles = {1: "MISKWA-KAMAW SIPIY", 2: "LAKE WINNIPEG", 3: "MIDNIGHT LAKE", 4: "WINTER TRAIL"};
-    if (titleDisplay.innerText !== titles[level]) titleDisplay.innerText = titles[level];
-
-    // Sky
-    if (level === 1 || level === 2) ctx.fillStyle = C_ACC3;
-    else if (level === 3) ctx.fillStyle = C_NIGHT;
-    else if (level === 4) ctx.fillStyle = C_ACC3;
-    ctx.fillRect(0, 0, 160, 80);
-
-    // Dynamic Parallax Ground
-    if (level === 1) ctx.fillStyle = C_SEC;
-    else if (level === 2) ctx.fillStyle = C_ACC2;
-    else if (level === 3) ctx.fillStyle = C_BASE;
-    else if (level === 4) ctx.fillStyle = C_SNOW;
-    ctx.fillRect(0, 20, 160, 16);
-    
-    let grassOffset = (bgOffset * 0.3) % 40;
-    ctx.fillStyle = (level === 3 || level === 4) ? C_ACC3 : C_BASE;
-    if (level !== 4) {
-      for(let i=-40; i<200; i+=20) {
-        ctx.fillRect(i - grassOffset, 22, 2, 4);
-        ctx.fillRect(i - grassOffset + 8, 26, 2, 3);
+    function sendSignal(command) {
+      if (isPlaying) {
+        gameFrame.contentWindow.postMessage(command, '*');
       }
     }
 
-    // Parallax Scenery
-    let sceneOffset = (bgOffset * 0.4) % 240;
-    let sil = (level === 3);
-    let winter = (level === 4);
-    
-    for(let i=-240; i<320; i+=240) {
-      if (level === 1) {
-        drawTreePatch(i - sceneOffset + 20, 12, false, false);
-        drawBuffalo(i - sceneOffset + 70, 24, false);
-        drawBuffalo(i - sceneOffset + 85, 26, false);
-        drawTipi(i - sceneOffset + 130, 18, false);
-        drawTipi(i - sceneOffset + 145, 20, false);
-        drawTreePatch(i - sceneOffset + 190, 14, false, false);
+    function pressDpad(directionStr) {
+      if (isPlaying) {
+        sendSignal(directionStr);
       } else {
-        drawShorelineRock(i - sceneOffset + 10, 20, sil, winter);
-        drawTreePatch(i - sceneOffset + 40, 10, sil, winter);
-        drawShorelineRock(i - sceneOffset + 80, 22, sil, winter);
-        drawTreePatch(i - sceneOffset + 110, 12, sil, winter);
-        drawShorelineRock(i - sceneOffset + 160, 18, sil, winter);
-        drawTreePatch(i - sceneOffset + 200, 14, sil, winter);
+        if (directionStr === 'DPAD_UP') moveMenu(-1);
+        if (directionStr === 'DPAD_DOWN') moveMenu(1);
       }
     }
 
-    // River / Track
-    if (level === 1) ctx.fillStyle = C_ACC1;
-    else if (level === 2 || level === 3) ctx.fillStyle = C_LAKE;
-    else if (level === 4) ctx.fillStyle = C_ACC3; // Ice path
-    ctx.fillRect(0, 36, 160, 44);
-
-    // Current Lines / Snow Tracks (Speed slowed by roughly half)
-    if (level === 1) ctx.fillStyle = C_ACC3;
-    else if (level === 2 || level === 3) ctx.fillStyle = C_FOAM;
-    else if (level === 4) ctx.fillStyle = C_SNOW;
-    
-    for(let i=0; i<6; i++) {
-      ctx.fillRect(((bgOffset * 0.5) + i*35) % 160, 42, 14, 2);
-      ctx.fillRect(((bgOffset * 0.55) + i*40 + 20) % 160, 56, 10, 2);
-      ctx.fillRect(((bgOffset * 0.6) + i*30 + 10) % 160, 70, 16, 2);
+    function moveMenu(direction) {
+      listItems[currentIndex].classList.remove('active');
+      currentIndex += direction;
+      if (currentIndex < 0) currentIndex = games.length - 1;
+      if (currentIndex >= games.length) currentIndex = 0;
+      listItems[currentIndex].classList.add('active');
     }
 
-    // Draw Obstacles
-    for(let i=0; i<obstacles.length; i++) {
-      let obs = obstacles[i];
-      let yPos = obs.lane === 0 ? 38 : (obs.lane === 1 ? 52 : 66);
-      
-      if(obs.type === 'whirlpool') {
-        ctx.save();
-        ctx.translate(obs.x + 5, yPos + 5);
-        ctx.rotate(frame * 0.2); 
-        ctx.translate(-(obs.x + 5), -(yPos + 5));
-        let spinCol = winter ? C_SNOW : C_ACC3;
-        drawSprite(whirlSprite, obs.x, yPos, {5: spinCol});
-        ctx.restore();
+    function btnAction(buttonStr) {
+      if (isPlaying) {
+        sendSignal(buttonStr);
       } else {
-        let palette;
-        if (winter) {
-          palette = obs.type === 'log' ? {4: C_BASE, 5: C_SNOW} : {2: C_SNOW, 5: C_SNOW};
-        } else {
-          palette = obs.type === 'log' ? {4: C_ACC2, 5: C_ACC3} : {2: C_SEC, 5: C_ACC3};
-        }
-        let sprite = obs.type === 'log' ? logSprite : rockSprite;
-        drawSprite(sprite, obs.x, yPos, palette);
-      }
-    }
-
-    // Draw Player
-    let playerY = playerLane === 0 ? 34 : (playerLane === 1 ? 48 : 62);
-    let pSprite = winter ? dogsledSprite : canoeSprite;
-    
-    if (isSpinning) {
-      ctx.save();
-      ctx.translate(29, playerY + 5); 
-      ctx.rotate((60 - spinFrame) * 0.4); 
-      ctx.translate(-29, -(playerY + 5));
-      drawSprite(pSprite, 15, playerY, {1: C_BASE, 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
-      ctx.restore();
-    } else {
-      let bob = (frame % 12 < 6 && !winter) ? 1 : 0;
-      drawSprite(pSprite, 15, playerY + bob, {1: C_BASE, 2: C_SEC, 4: C_ACC2, 5: C_ACC3});
-    }
-  }
-
-  function checkCollisions() {
-    let pBox = { x: 19, y: playerLane === 0 ? 34 : (playerLane === 1 ? 48 : 62), w: 20, h: 8 };
-    
-    for(let i=0; i<obstacles.length; i++) {
-      let obs = obstacles[i];
-      let oBox = { x: obs.x, y: obs.lane === 0 ? 38 : (obs.lane === 1 ? 52 : 66), w: 10, h: 6 };
-      
-      if (!obs.hit && pBox.x < oBox.x + oBox.w && pBox.x + pBox.w > oBox.x &&
-          pBox.y < oBox.y + oBox.h && pBox.y + pBox.h > oBox.y) {
-        
-        if(obs.type === 'whirlpool') {
-          obs.hit = true;
-          isSpinning = true;
-          spinFrame = 60; 
-          playerLane = 1; 
-        } else {
-          gameOver();
+        if (buttonStr === 'BUTTON_A') {
+          dosMenu.style.display = 'none';
+          gameFrame.style.display = 'block';
+          gameFrame.src = games[currentIndex];
+          isPlaying = true;
         }
       }
-      
-      if(!obs.passed && obs.x < 15) {
-        if(!obs.hit) score += 10; 
-        obs.passed = true;
+    }
+
+    function btnHome() {
+      if (isPlaying) {
+        gameFrame.src = ""; 
+        gameFrame.style.display = 'none';
+        dosMenu.style.display = 'flex';
+        isPlaying = false;
       }
     }
-  }
+  </script>
 
-  function update() {
-    if(!isPlaying) return;
-    
-    bgOffset += speed;
-    scoreDisplay.innerText = 'DIST: ' + score;
-    speed += 0.0015; 
-
-    if (isSpinning) {
-      spinFrame--;
-      if (spinFrame <= 0) isSpinning = false;
-    }
-
-    for(let i=0; i<obstacles.length; i++) {
-      obstacles[i].x -= speed;
-    }
-    obstacles = obstacles.filter(o => o.x > -20);
-
-    spawnObstacle();
-    drawScene();
-    checkCollisions();
-    
-    frame++;
-    requestAnimationFrame(update);
-  }
-
-  function movePlayer(direction) {
-    if(!isPlaying || isGameOver || isSpinning) return;
-    
-    clearTimeout(returnTimer);
-    
-    if(direction === 'up') playerLane = 0;
-    if(direction === 'down') playerLane = 2;
-    
-    returnTimer = setTimeout(() => {
-      if(isPlaying && !isSpinning) playerLane = 1;
-    }, 800);
-  }
-
-  function startGame() {
-    isPlaying = true;
-    isGameOver = false;
-    isSpinning = false;
-    score = 0;
-    speed = 2.5;
-    obstacles = [];
-    playerLane = 1;
-    msg.style.display = 'none';
-    update();
-  }
-
-  function gameOver() {
-    isPlaying = false;
-    isGameOver = true;
-    msg.innerHTML = "CRASHED!<br><br>PRESS 'A' TO RESTART";
-    msg.style.display = 'block';
-  }
-
-  // Arcade Cabinet UI postMessage Listener
-  window.addEventListener('message', function(event) {
-    const command = event.data;
-    if (command === 'DPAD_UP') movePlayer('up');
-    else if (command === 'DPAD_DOWN') movePlayer('down');
-    else if (command === 'BUTTON_A' && !isPlaying) startGame();
-  });
-
-  // Fallback Start on screen tap
-  document.getElementById('screen-container').addEventListener('click', () => {
-    if(!isPlaying) startGame();
-  });
-
-  msg.style.display = 'block';
-  drawScene();
-
-</script>
 </body>
 </html>
