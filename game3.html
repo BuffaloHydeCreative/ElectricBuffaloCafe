@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Beadwork Puzzle</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: transparent;
+            color: #ffffff;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            touch-action: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+            padding: 10px;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            max-width: 500px;
+            object-fit: contain;
+            background-color: #050505; 
+            border: 6px solid #222; 
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            aspect-ratio: 3 / 4; /* Matches vertical arcade screen */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="400" height="533"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Core Game Constants
+        const COLS = 10;
+        const ROWS = 10;
+        const CELL_SIZE = 40;
+        const OFFSET_X = 0; // Centered internally below
+        const OFFSET_Y = 80; // Space for UI at the top
+        
+        // Theme Colors (Red, Blue, Yellow)
+        const COLORS = [null, '#E3000F', '#00478D', '#FFD700'];
+        
+        let gameState = 'START'; // START, PLAYING, CASCADING, GAME_OVER
+        let board = [];
+        let score = 0;
+        let combo = 0;
+        
+        // Active falling piece
+        let active = { x: 4, y: 0, c1: 1, c2: 1, dir: 0 }; 
+        // dir: 0=Right, 1=Down, 2=Left, 3=Up (c2 position relative to c1)
+        
+        // Timing variables
+        let lastDropTime = 0;
+        let dropInterval = 800; // Falling speed
+        
+        let lastRowTime = 0;
+        let rowPushInterval = 8000; // Starts at 8 seconds
+        let minimumRowInterval = 1500; // Caps at 1.5 seconds
+
+        // ---------------------------------------------------------
+        // SIGNAL BRIDGE: Listens to index.html Arcade Controls
+        // ---------------------------------------------------------
+        window.addEventListener('message', function(event) {
+            const cmd = event.data;
+            
+            if (gameState === 'START' || gameState === 'GAME_OVER') {
+                if (cmd === 'BUTTON_A') startGame();
+                return;
+            }
+
+            if (gameState === 'PLAYING') {
+                if (cmd === 'DPAD_LEFT') moveActive(-1, 0);
+                if (cmd === 'DPAD_RIGHT') moveActive(1, 0);
+                if (cmd === 'DPAD_DOWN') moveActive(0, 1); // Soft drop
+                if (cmd === 'DPAD_UP') dropInstantly(); // Hard drop
+                if (cmd === 'BUTTON_A') rotateActive(1); // Clockwise
+                if (cmd === 'BUTTON_B') rotateActive(-1); // Counter-clockwise
+            }
+        });
+
+        function startGame() {
+            // Initialize 10x10 empty board
+            board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+            
+            // Generate 4x4 starting block bottom-centered
+            for(let r = 6; r < 10; r++) {
+                for(let c = 3; c < 7; c++) {
+                    board[r][c] = Math.floor(Math.random() * 3) + 1;
+                }
+            }
+            
+            score = 0;
+            combo = 0;
+            rowPushInterval = 8000;
+            lastDropTime = performance.now();
+            lastRowTime = performance.now();
+            spawnPiece();
+            gameState = 'PLAYING';
+            
+            // Clear immediate initial matches just in case
+            resolveMatches(); 
+        }
+
+        function spawnPiece() {
+            active.x = 4;
+            active.y = 0;
+            active.dir = 0;
+            active.c1 = Math.floor(Math.random() * 3) + 1;
+            active.c2 = Math.floor(Math.random() * 3) + 1;
+            
+            // Check instant Game Over on spawn
+            if (!isValid(active.x, active.y, active.dir)) {
+                gameState = 'GAME_OVER';
+            }
+        }
+
+        // Active Piece Mechanics
+        function getC2Pos(x, y, dir) {
+            if (dir === 0) return { x: x + 1, y: y };
+            if (dir === 1) return { x: x, y: y + 1 };
+            if (dir === 2) return { x: x - 1, y: y };
+            if (dir === 3) return { x: x, y: y - 1 };
+        }
+
+        function isValid(x, y, dir) {
+            // Check c1
+            if (x < 0 || x >= COLS || y < 0 || y >= ROWS || board[y][x] !== 0) return false;
+            // Check c2
+            let p2 = getC2Pos(x, y, dir);
+            if (p2.x < 0 || p2.x >= COLS || p2.y < 0 || p2.y >= ROWS || board[p2.y][p2.x] !== 0) return false;
+            return true;
+        }
+
+        function moveActive(dx, dy) {
+            if (isValid(active.x + dx, active.y + dy, active.dir)) {
+                active.x += dx;
+                active.y += dy;
+                return true;
+            } else if (dy > 0) {
+                // If moving down failed, lock the piece
+                lockPiece();
+            }
+            return false;
+        }
+
+        function dropInstantly() {
+            while(moveActive(0, 1)) {}
+            lockPiece();
+        }
+
+        function rotateActive(direction) {
+            let newDir = (active.dir + direction + 4) % 4;
+            if (isValid(active.x, active.y, newDir)) {
+                active.dir = newDir;
+            } else {
+                // Basic Wall Kick: try shifting left/right/up to accommodate rotation
+                if (isValid(active.x - 1, active.y, newDir)) { active.x -= 1; active.dir = newDir; }
+                else if (isValid(active.x + 1, active.y, newDir)) { active.x += 1; active.dir = newDir; }
+                else if (isValid(active.x, active.y - 1, newDir)) { active.y -= 1; active.dir = newDir; }
+            }
+        }
+
+        function lockPiece() {
+            board[active.y][active.x] = active.c1;
+            let p2 = getC2Pos(active.x, active.y, active.dir);
+            board[p2.y][p2.x] = active.c2;
+            combo = 0;
+            gameState = 'CASCADING';
+            resolveMatches();
+        }
+
+        // Matching and Gravity
+        function resolveMatches() {
+            let matched = findMatches();
+            if (matched.length > 0) {
+                combo++;
+                score += (matched.length * 10) * combo;
+                
+                // Clear matched beads
+                matched.forEach(p => { board[p.y][p.x] = 0; });
+                
+                // Trigger gravity after a slight delay to show matches disappearing
+                setTimeout(applyGravity, 250);
+            } else {
+                if (gameState === 'CASCADING') {
+                    gameState = 'PLAYING';
+                    spawnPiece();
+                }
+            }
+        }
+
+        function findMatches() {
+            let matched = new Set();
+            
+            // Horizontal checking
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c <= COLS - 4; c++) {
+                    let color = board[r][c];
+                    if (color !== 0 && color === board[r][c+1] && color === board[r][c+2] && color === board[r][c+3]) {
+                        matched.add(`${r},${c}`); matched.add(`${r},${c+1}`);
+                        matched.add(`${r},${c+2}`); matched.add(`${r},${c+3}`);
+                    }
+                }
+            }
+            
+            // Vertical checking
+            for (let c = 0; c < COLS; c++) {
+                for (let r = 0; r <= ROWS - 4; r++) {
+                    let color = board[r][c];
+                    if (color !== 0 && color === board[r+1][c] && color === board[r+2][c] && color === board[r+3][c]) {
+                        matched.add(`${r},${c}`); matched.add(`${r+1},${c}`);
+                        matched.add(`${r+2},${c}`); matched.add(`${r+3},${c}`);
+                    }
+                }
+            }
+            
+            return Array.from(matched).map(str => {
+                let parts = str.split(',');
+                return { y: parseInt(parts[0]), x: parseInt(parts[1]) };
+            });
+        }
+
+        function applyGravity() {
+            let moved = false;
+            // Iterate bottom up, move floating beads down
+            for (let c = 0; c < COLS; c++) {
+                for (let r = ROWS - 2; r >= 0; r--) {
+                    if (board[r][c] !== 0) {
+                        let dropTo = r;
+                        while (dropTo + 1 < ROWS && board[dropTo + 1][c] === 0) {
+                            dropTo++;
+                        }
+                        if (dropTo !== r) {
+                            board[dropTo][c] = board[r][c];
+                            board[r][c] = 0;
+                            moved = true;
+                        }
+                    }
+                }
+            }
+            
+            // After settling, check for new combos
+            if (moved) {
+                setTimeout(resolveMatches, 250);
+            } else {
+                resolveMatches(); // Check if new settled positions form matches
+            }
+        }
+
+        // The Pressure Mechanic: Rising Rows
+        function pushRowsUp() {
+            if (gameState !== 'PLAYING') return;
+
+            // Check Game Over condition (top row occupied)
+            for(let c = 0; c < COLS; c++) {
+                if (board[0][c] !== 0) {
+                    gameState = 'GAME_OVER';
+                    return;
+                }
+            }
+
+            // Shift all rows up by 1
+            for (let r = 0; r < ROWS - 1; r++) {
+                board[r] = [...board[r+1]];
+            }
+
+            // Spawn a random bottom row
+            for(let c = 0; c < COLS; c++) {
+                board[ROWS - 1][c] = Math.floor(Math.random() * 3) + 1;
+            }
+
+            // Adjust active piece upward to avoid overlap, or kill if crushed
+            if (active.y > 0) active.y -= 1;
+            
+            // Increase speed/pressure
+            rowPushInterval = Math.max(minimumRowInterval, rowPushInterval - 200);
+            
+            // Resolve any accidental matches formed by the new row
+            let matched = findMatches();
+            if(matched.length > 0) resolveMatches();
+        }
+
+        // ---------------------------------------------------------
+        // RENDERING & LOOP
+        // ---------------------------------------------------------
+        function drawBead(x, y, colorCode) {
+            if (colorCode === 0) return;
+            let cx = x * CELL_SIZE + (CELL_SIZE / 2);
+            let cy = y * CELL_SIZE + (CELL_SIZE / 2);
+            
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.beginPath();
+            ctx.arc(cx + 2, cy + 2, CELL_SIZE / 2.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Main Bead Color
+            ctx.fillStyle = COLORS[colorCode];
+            ctx.beginPath();
+            ctx.arc(cx, cy, CELL_SIZE / 2.2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Shine / Highlight (Glass bead effect)
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.beginPath();
+            ctx.arc(cx - 5, cy - 5, CELL_SIZE / 6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Inner core dot
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.beginPath();
+            ctx.arc(cx, cy, CELL_SIZE / 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawScene() {
+            // Background clearing
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Stylized Woodland Floral Border Hint
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 2;
+            for(let i=0; i<8; i++) {
+                ctx.beginPath();
+                ctx.arc(20 + i*50, 40, 15, 0, Math.PI);
+                ctx.stroke();
+            }
+
+            // Draw UI
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 20px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText(`SCORE: ${score}`, 10, 30);
+            ctx.textAlign = 'right';
+            ctx.fillText(`PUSH IN: ${Math.ceil(rowPushInterval/1000)}s`, canvas.width - 10, 30);
+
+            // Draw Play Area Grid Background
+            ctx.fillStyle = '#111';
+            ctx.fillRect(OFFSET_X, OFFSET_Y, COLS * CELL_SIZE, ROWS * CELL_SIZE);
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 1;
+            for(let r = 0; r <= ROWS; r++) {
+                ctx.beginPath(); ctx.moveTo(OFFSET_X, OFFSET_Y + r*CELL_SIZE); ctx.lineTo(OFFSET_X + COLS*CELL_SIZE, OFFSET_Y + r*CELL_SIZE); ctx.stroke();
+            }
+            for(let c = 0; c <= COLS; c++) {
+                ctx.beginPath(); ctx.moveTo(OFFSET_X + c*CELL_SIZE, OFFSET_Y); ctx.lineTo(OFFSET_X + c*CELL_SIZE, OFFSET_Y + ROWS*CELL_SIZE); ctx.stroke();
+            }
+
+            // Draw Overlays
+            if (gameState === 'START') {
+                ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                ctx.fillRect(OFFSET_X, OFFSET_Y, COLS * CELL_SIZE, ROWS * CELL_SIZE);
+                ctx.fillStyle = '#FFD700';
+                ctx.font = 'bold 26px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText("BEADWORK PUZZLE", canvas.width/2, OFFSET_Y + 150);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 16px Courier New';
+                ctx.fillText("MATCH 4 COLORS", canvas.width/2, OFFSET_Y + 190);
+                ctx.fillText("PRESS 'A' TO START", canvas.width/2, OFFSET_Y + 240);
+                return;
+            }
+
+            // Draw Locked Board
+            ctx.save();
+            ctx.translate(OFFSET_X, OFFSET_Y);
+            for(let r = 0; r < ROWS; r++) {
+                for(let c = 0; c < COLS; c++) {
+                    drawBead(c, r, board[r][c]);
+                }
+            }
+
+            // Draw Active Piece
+            if (gameState === 'PLAYING') {
+                drawBead(active.x, active.y, active.c1);
+                let p2 = getC2Pos(active.x, active.y, active.dir);
+                drawBead(p2.x, p2.y, active.c2);
+            }
+            ctx.restore();
+
+            if (gameState === 'GAME_OVER') {
+                ctx.fillStyle = 'rgba(0,0,0,0.85)';
+                ctx.fillRect(OFFSET_X, OFFSET_Y, COLS * CELL_SIZE, ROWS * CELL_SIZE);
+                ctx.fillStyle = '#E3000F';
+                ctx.font = 'bold 30px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText("GAME OVER", canvas.width/2, OFFSET_Y + 150);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 18px Courier New';
+                ctx.fillText(`FINAL SCORE: ${score}`, canvas.width/2, OFFSET_Y + 200);
+                ctx.fillText("PRESS 'A' TO REPLAY", canvas.width/2, OFFSET_Y + 250);
+            }
+        }
+
+        function gameLoop(timestamp) {
+            if (gameState === 'PLAYING') {
+                // Standard Gravity Drop
+                if (timestamp - lastDropTime > dropInterval) {
+                    moveActive(0, 1);
+                    lastDropTime = timestamp;
+                }
+                
+                // Bottom Row Push Mechanics
+                if (timestamp - lastRowTime > rowPushInterval) {
+                    pushRowsUp();
+                    lastRowTime = timestamp;
+                }
+            }
+            
+            drawScene();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Boot
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
