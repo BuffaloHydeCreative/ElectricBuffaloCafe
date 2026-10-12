@@ -22,7 +22,7 @@
       max-width: 450px;
       aspect-ratio: 9/16;
       max-height: 100vh;
-      background: #111;
+      background: #0d0d0d;
       border-radius: 20px;
       border: 4px solid #333;
       display: flex;
@@ -32,16 +32,18 @@
       overflow: hidden;
     }
 
-    /* --- TOP HALF: CRT MONITOR --- */
+    /* --- SECTION 1: CRT MONITOR (Angled Away) --- */
     .monitor-bezel {
-      flex: 0 0 50%;
-      background: #050505;
-      padding: 15px;
-      border-bottom: 4px solid #222;
+      flex: 0 0 58%; /* Increased screen space */
+      background: linear-gradient(to bottom, #000 0%, #151515 100%);
+      padding: 15px 15px 5px 15px; /* Tighter padding to maximize screen */
       box-sizing: border-box;
       display: flex;
       justify-content: center;
       align-items: center;
+      position: relative;
+      /* Faux 3D inner shadow to simulate the deep monitor housing */
+      box-shadow: inset 0 25px 35px rgba(0,0,0,0.9), inset 0 -5px 10px rgba(255,255,255,0.05);
     }
 
     .crt-screen {
@@ -130,29 +132,33 @@
       box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
     }
 
-    /* --- BOTTOM HALF: CONTROL PAD --- */
+    /* --- SECTION 2: CONTROL DECK (Flat & Level) --- */
     .control-deck {
-      flex: 1;
-      background: #1e1e1e;
+      flex: 0 0 25%;
+      /* Gradient simulates flat light hitting the panel */
+      background: linear-gradient(to bottom, #2b2b2b 0%, #1a1a1a 15%, #111 100%);
+      border-top: 3px solid #666; /* Bright leading edge connecting to monitor */
+      border-bottom: 8px solid #000; /* Heavy drop-off lip connecting to front panel */
+      box-shadow: 0 15px 25px rgba(0,0,0,0.9); /* Shadows cast down onto the front panel */
       position: relative;
-      padding: 20px;
+      padding: 0 25px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      z-index: 5;
     }
 
-    /* --- NEW: DIGITAL JOYSTICK --- */
+    /* Digital Joystick */
     .joystick-base {
       width: 120px;
       height: 120px;
       background: radial-gradient(circle, #1a1a1a 30%, #2a2a2a 100%);
       border-radius: 50%;
-      border: 4px solid #111;
-      box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 2px 5px rgba(255,255,255,0.05);
+      border: 4px solid #050505;
+      box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 2px 5px rgba(255,255,255,0.1);
       position: relative;
     }
 
-    /* Invisible Hit Zones */
     .j-dir {
       position: absolute;
       z-index: 2;
@@ -163,65 +169,26 @@
     .j-left { top: 30px; left: 0; width: 60px; height: 60px; border-radius: 30px 0 0 30px; }
     .j-right { top: 30px; right: 0; width: 60px; height: 60px; border-radius: 0 30px 30px 0; }
 
-    /* The Stick Itself */
+    /* The Stick Itself (Larger Ball) */
     .joystick-stick {
-      width: 50px;
-      height: 50px;
-      background: radial-gradient(circle at 35% 35%, #777, #333);
+      width: 65px; /* Increased from 50px */
+      height: 65px;
+      background: radial-gradient(circle at 35% 35%, #888, #222);
       border-radius: 50%;
       position: absolute;
-      top: 35px; left: 35px;
+      top: 27.5px; left: 27.5px; /* Perfectly centered */
       box-shadow: 8px 12px 15px rgba(0,0,0,0.6), inset -5px -5px 15px rgba(0,0,0,0.7);
       pointer-events: none;
       transition: transform 0.05s ease-out;
       z-index: 1;
     }
 
-    /* CSS Magic: Stick moves when hit zones are active */
-    .j-up:active ~ .joystick-stick { transform: translateY(-15px); box-shadow: 8px 25px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
-    .j-down:active ~ .joystick-stick { transform: translateY(15px); box-shadow: 8px 0px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
-    .j-left:active ~ .joystick-stick { transform: translateX(-15px); box-shadow: 20px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
-    .j-right:active ~ .joystick-stick { transform: translateX(15px); box-shadow: -5px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    .j-up:active ~ .joystick-stick { transform: translateY(-12px); box-shadow: 8px 25px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    .j-down:active ~ .joystick-stick { transform: translateY(12px); box-shadow: 8px 0px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    .j-left:active ~ .joystick-stick { transform: translateX(-12px); box-shadow: 20px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    .j-right:active ~ .joystick-stick { transform: translateX(12px); box-shadow: -5px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
 
-    /* --- NEW: 90s COIN INSERT (HOME) --- */
-    .coin-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-top: 35px;
-    }
-
-    .coin-btn {
-      width: 45px;
-      height: 60px;
-      background: rgba(230, 60, 20, 0.85); /* Burnt orange / semi-transparent */
-      border: 3px solid #050505;
-      border-radius: 6px;
-      cursor: pointer;
-      box-shadow: inset 0 0 12px rgba(255,180,100,0.6), inset 0 0 4px rgba(0,0,0,0.8), 0 4px 0 #000;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      position: relative;
-    }
-
-    .coin-btn:active {
-      transform: translateY(4px);
-      box-shadow: inset 0 0 12px rgba(255,180,100,0.6), inset 0 0 4px rgba(0,0,0,0.8), 0 0 0 #000;
-    }
-
-    .coin-text {
-      font-family: Arial, sans-serif;
-      font-weight: 900; 
-      font-size: 8px;
-      color: rgba(255, 255, 255, 0.95);
-      text-shadow: 0 0 4px rgba(255,255,255,0.6);
-      line-height: 1.2;
-    }
-
-    /* --- NEW: CONCAVE ACTION BUTTONS --- */
+    /* Concave Action Buttons */
     .action-container {
       display: flex;
       gap: 15px;
@@ -242,11 +209,9 @@
       border: 3px solid #111;
       cursor: pointer;
       position: relative;
-      /* Concave shadow styling */
       box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 6px 0 #050505, 0 10px 15px rgba(0,0,0,0.6);
     }
     
-    /* Top plastic gloss reflection */
     .action-btn::after {
       content: '';
       position: absolute;
@@ -261,7 +226,6 @@
       box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 0 0 #050505, 0 4px 6px rgba(0,0,0,0.6);
     }
 
-    /* Deep base colors for the gradient overlay */
     .btn-b { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #e0a800; margin-top: 25px; }
     .btn-a { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #cc0000; }
 
@@ -270,13 +234,65 @@
       font-weight: bold;
       color: #777;
     }
+
+    /* --- SECTION 3: FRONT PANEL (Straight Down) --- */
+    .front-panel {
+      flex: 1; /* Automatically takes the remaining ~17% */
+      background: linear-gradient(to bottom, #050505 0%, #111 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      z-index: 4; /* Sits beneath the control deck shadow */
+    }
+
+    /* 90s Coin Insert Plate (Moved to Front Panel) */
+    .coin-door {
+      background: #1a1a1a;
+      border: 3px solid #000;
+      border-radius: 6px;
+      padding: 10px 15px;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 2px 4px rgba(255,255,255,0.05);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .coin-btn {
+      width: 45px;
+      height: 60px;
+      background: rgba(230, 60, 20, 0.85);
+      border: 3px solid #050505;
+      border-radius: 6px;
+      cursor: pointer;
+      box-shadow: inset 0 0 12px rgba(255,180,100,0.6), inset 0 0 4px rgba(0,0,0,0.8), 0 4px 0 #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .coin-btn:active {
+      transform: translateY(4px);
+      box-shadow: inset 0 0 12px rgba(255,180,100,0.6), inset 0 0 4px rgba(0,0,0,0.8), 0 0 0 #000;
+    }
+
+    .coin-text {
+      font-family: Arial, sans-serif;
+      font-weight: 900; 
+      font-size: 8px;
+      color: rgba(255, 255, 255, 0.95);
+      text-shadow: 0 0 4px rgba(255,255,255,0.6);
+      line-height: 1.2;
+    }
   </style>
 </head>
 <body>
 
   <div class="arcade-machine">
     
-    <!-- CRT MONITOR -->
+    <!-- 1. CRT MONITOR (Angled Back) -->
     <div class="monitor-bezel">
       <div class="crt-screen">
         
@@ -284,114 +300,4 @@
         <div id="dos-menu">
           <div class="dos-header">FESTIVAL_OS.EXE<br>MEM OK...</div>
           <ul class="dos-list" id="game-list">
-            <li class="active">game1.html</li>
-            <li>game2.html</li>
-            <li>game3.html</li>
-            <li>game4.html</li>
-            <li>game5.html</li>
-            <li>game6.html</li>
-            <li>game7.html</li>
-          </ul>
-        </div>
-
-        <!-- The Game Player -->
-        <iframe id="arcade-frame" title="Game Screen"></iframe>
-      </div>
-    </div>
-
-    <!-- CONTROL PAD -->
-    <div class="control-deck">
-      
-      <!-- Digital Joystick -->
-      <div class="joystick-base">
-        <!-- Invisible hit zones driving CSS stick movement -->
-        <div class="j-dir j-up" onmousedown="pressDpad('DPAD_UP')" ontouchstart="pressDpad('DPAD_UP')"></div>
-        <div class="j-dir j-right" onmousedown="pressDpad('DPAD_RIGHT')" ontouchstart="pressDpad('DPAD_RIGHT')"></div>
-        <div class="j-dir j-down" onmousedown="pressDpad('DPAD_DOWN')" ontouchstart="pressDpad('DPAD_DOWN')"></div>
-        <div class="j-dir j-left" onmousedown="pressDpad('DPAD_LEFT')" ontouchstart="pressDpad('DPAD_LEFT')"></div>
-        <div class="joystick-stick"></div>
-      </div>
-
-      <!-- Coin Insert (Home) Button -->
-      <div class="coin-container">
-        <div class="coin-btn" onclick="btnHome()">
-          <span class="coin-text">INSERT<br>COIN</span>
-        </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="action-container">
-        <div class="action-btn-wrapper">
-          <div class="action-btn btn-b" onclick="btnAction('BUTTON_B')"></div>
-          <span class="btn-label">B</span>
-        </div>
-        <div class="action-btn-wrapper">
-          <div class="action-btn btn-a" onclick="btnAction('BUTTON_A')"></div>
-          <span class="btn-label">A</span>
-        </div>
-      </div>
-
-    </div>
-
-  </div>
-
-  <script>
-    let currentIndex = 0;
-    const games = [
-      'game1.html', 'game2.html', 'game3.html', 
-      'game4.html', 'game5.html', 'game6.html', 'game7.html'
-    ];
-    let isPlaying = false;
-
-    const listItems = document.querySelectorAll('#game-list li');
-    const dosMenu = document.getElementById('dos-menu');
-    const gameFrame = document.getElementById('arcade-frame');
-
-    function sendSignal(command) {
-      if (isPlaying) {
-        gameFrame.contentWindow.postMessage(command, '*');
-      }
-    }
-
-    function pressDpad(directionStr) {
-      if (isPlaying) {
-        sendSignal(directionStr);
-      } else {
-        if (directionStr === 'DPAD_UP') moveMenu(-1);
-        if (directionStr === 'DPAD_DOWN') moveMenu(1);
-      }
-    }
-
-    function moveMenu(direction) {
-      listItems[currentIndex].classList.remove('active');
-      currentIndex += direction;
-      if (currentIndex < 0) currentIndex = games.length - 1;
-      if (currentIndex >= games.length) currentIndex = 0;
-      listItems[currentIndex].classList.add('active');
-    }
-
-    function btnAction(buttonStr) {
-      if (isPlaying) {
-        sendSignal(buttonStr);
-      } else {
-        if (buttonStr === 'BUTTON_A') {
-          dosMenu.style.display = 'none';
-          gameFrame.style.display = 'block';
-          gameFrame.src = games[currentIndex];
-          isPlaying = true;
-        }
-      }
-    }
-
-    function btnHome() {
-      if (isPlaying) {
-        gameFrame.src = ""; 
-        gameFrame.style.display = 'none';
-        dosMenu.style.display = 'flex';
-        isPlaying = false;
-      }
-    }
-  </script>
-
-</body>
-</html>
+            <li class="active">game
