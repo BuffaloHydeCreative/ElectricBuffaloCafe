@@ -12,18 +12,17 @@
       color: #fff; 
       font-family: 'Courier New', Courier, monospace; 
       display: flex; justify-content: center; align-items: center;
-      height: 100vh; width: 100vw;
-      overflow: hidden;
+      height: 100vh; overflow: hidden;
       touch-action: none; 
     }
 
-    /* Main Mobile Arcade Cabinet */
+    /* Main 9:16 Mobile Arcade Cabinet */
     .arcade-machine {
       width: 100%;
       max-width: 450px;
-      height: 100%;
+      aspect-ratio: 9/16;
       max-height: 100vh;
-      background: #0d0d0d;
+      background: #111;
       border-radius: 20px;
       border: 4px solid #333;
       display: flex;
@@ -31,21 +30,18 @@
       box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05);
       position: relative;
       overflow: hidden;
-      box-sizing: border-box;
     }
 
-    /* --- SECTION 1: CRT MONITOR (Dynamic Flex Height) --- */
+    /* --- TOP HALF: CRT MONITOR --- */
     .monitor-bezel {
-      flex: 1; /* Automatically takes all remaining vertical space */
-      min-height: 250px; /* Ensures the screen never gets too squished */
-      background: linear-gradient(to bottom, #000 0%, #151515 100%);
-      padding: 15px 15px 5px 15px;
+      flex: 0 0 50%;
+      background: #050505;
+      padding: 15px;
+      border-bottom: 4px solid #222;
       box-sizing: border-box;
       display: flex;
       justify-content: center;
       align-items: center;
-      position: relative;
-      box-shadow: inset 0 25px 35px rgba(0,0,0,0.9), inset 0 -5px 10px rgba(255,255,255,0.05);
     }
 
     .crt-screen {
@@ -134,63 +130,78 @@
       box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
     }
 
-    /* --- SECTION 2: CONTROL DECK (Fixed Height) --- */
+    /* --- BOTTOM HALF: CONTROL PAD --- */
     .control-deck {
-      flex: 0 0 160px; /* Locked height so controls never disappear */
-      background: linear-gradient(to bottom, #2b2b2b 0%, #1a1a1a 15%, #111 100%);
-      border-top: 3px solid #666; 
-      border-bottom: 8px solid #000; 
-      box-shadow: 0 15px 25px rgba(0,0,0,0.9); 
+      flex: 1;
+      background: #1e1e1e;
       position: relative;
-      padding: 0 25px;
+      padding: 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      z-index: 5;
-      box-sizing: border-box;
     }
 
-    /* Digital Joystick */
-    .joystick-base {
+    /* D-Pad (Left Side) */
+    .d-pad-container {
       width: 120px;
       height: 120px;
-      background: radial-gradient(circle, #1a1a1a 30%, #2a2a2a 100%);
-      border-radius: 50%;
-      border: 4px solid #050505;
-      box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 2px 5px rgba(255,255,255,0.1);
       position: relative;
     }
-
-    .j-dir {
+    
+    .d-pad-btn {
       position: absolute;
-      z-index: 2;
+      background: #333;
+      border: 4px solid #111;
+      border-radius: 4px;
       cursor: pointer;
-    }
-    .j-up { top: 0; left: 30px; width: 60px; height: 60px; border-radius: 30px 30px 0 0; }
-    .j-down { bottom: 0; left: 30px; width: 60px; height: 60px; border-radius: 0 0 30px 30px; }
-    .j-left { top: 30px; left: 0; width: 60px; height: 60px; border-radius: 30px 0 0 30px; }
-    .j-right { top: 30px; right: 0; width: 60px; height: 60px; border-radius: 0 30px 30px 0; }
-
-    /* The Stick Itself */
-    .joystick-stick {
-      width: 65px; 
-      height: 65px;
-      background: radial-gradient(circle at 35% 35%, #888, #222);
-      border-radius: 50%;
-      position: absolute;
-      top: 27.5px; left: 27.5px; 
-      box-shadow: 8px 12px 15px rgba(0,0,0,0.6), inset -5px -5px 15px rgba(0,0,0,0.7);
-      pointer-events: none;
-      transition: transform 0.05s ease-out;
-      z-index: 1;
+      box-shadow: 0 4px 0 #000;
     }
 
-    .j-up:active ~ .joystick-stick { transform: translateY(-12px); box-shadow: 8px 25px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
-    .j-down:active ~ .joystick-stick { transform: translateY(12px); box-shadow: 8px 0px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
-    .j-left:active ~ .joystick-stick { transform: translateX(-12px); box-shadow: 20px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
-    .j-right:active ~ .joystick-stick { transform: translateX(12px); box-shadow: -5px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    /* Replaced :active with explicit JS class */
+    .d-pad-btn.stick-tilted {
+      transform: translateY(4px);
+      box-shadow: 0 0 0 #000;
+      background: #444;
+    }
 
-    /* Concave Action Buttons */
+    .d-up { top: 0; left: 40px; width: 40px; height: 45px; border-bottom: none; border-radius: 8px 8px 0 0; }
+    .d-down { bottom: 0; left: 40px; width: 40px; height: 45px; border-top: none; border-radius: 0 0 8px 8px; }
+    .d-left { top: 40px; left: 0; width: 45px; height: 40px; border-right: none; border-radius: 8px 0 0 8px; }
+    .d-right { top: 40px; right: 0; width: 45px; height: 40px; border-left: none; border-radius: 0 8px 8px 0; }
+    .d-center { top: 40px; left: 40px; width: 40px; height: 40px; background: #333; border: none; }
+
+    /* Center Home Button */
+    .home-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      margin-top: 40px;
+    }
+
+    .home-btn {
+      width: 45px;
+      height: 20px;
+      background: #555;
+      border-radius: 10px;
+      border: 3px solid #111;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #000;
+    }
+
+    .home-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 0 0 #000;
+    }
+
+    .home-label {
+      font-size: 10px;
+      font-weight: bold;
+      color: #888;
+      letter-spacing: 1px;
+    }
+
+    /* Action Buttons (Right Side) */
     .action-container {
       display: flex;
       gap: 15px;
@@ -201,92 +212,31 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
     }
 
     .action-btn {
-      width: 55px;
-      height: 55px;
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
-      border: 3px solid #111;
+      border: 4px solid #111;
       cursor: pointer;
-      position: relative;
-      box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 6px 0 #050505, 0 10px 15px rgba(0,0,0,0.6);
-    }
-    
-    .action-btn::after {
-      content: '';
-      position: absolute;
-      top: 4px; left: 10px; right: 10px; height: 18px;
-      background: linear-gradient(rgba(255,255,255,0.25), transparent);
-      border-radius: 20px 20px 0 0;
-      pointer-events: none;
+      box-shadow: 0 6px 0 #000;
     }
 
     .action-btn:active {
       transform: translateY(6px);
-      box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 0 0 #050505, 0 4px 6px rgba(0,0,0,0.6);
+      box-shadow: 0 0 0 #000;
     }
 
-    .btn-b { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #e0a800; margin-top: 25px; }
-    .btn-a { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #cc0000; }
+    .btn-b { background: #ffcc00; margin-top: 25px; }
+    .btn-a { background: #e60000; }
 
     .btn-label {
       font-size: 12px;
       font-weight: bold;
-      color: #777;
-    }
-
-    /* --- SECTION 3: FRONT PANEL (Fixed Height) --- */
-    .front-panel {
-      flex: 0 0 90px; /* Locked height to guarantee coin door fits */
-      background: linear-gradient(to bottom, #050505 0%, #111 100%);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-      z-index: 4; 
-    }
-
-    /* 90s Coin Insert Plate */
-    .coin-door {
-      background: #1a1a1a;
-      border: 3px solid #000;
-      border-radius: 6px;
-      padding: 10px 15px;
-      box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 2px 4px rgba(255,255,255,0.05);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .coin-btn {
-      width: 45px;
-      height: 60px;
-      background: rgba(230, 60, 20, 0.85);
-      border: 3px solid #050505;
-      border-radius: 6px;
-      cursor: pointer;
-      box-shadow: inset 0 0 12px rgba(255,180,100,0.6), inset 0 0 4px rgba(0,0,0,0.8), 0 4px 0 #000;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-    }
-
-    .coin-btn:active {
-      transform: translateY(4px);
-      box-shadow: inset 0 0 12px rgba(255,180,100,0.6), inset 0 0 4px rgba(0,0,0,0.8), 0 0 0 #000;
-    }
-
-    .coin-text {
-      font-family: Arial, sans-serif;
-      font-weight: 900; 
-      font-size: 8px;
-      color: rgba(255, 255, 255, 0.95);
-      text-shadow: 0 0 4px rgba(255,255,255,0.6);
-      line-height: 1.2;
+      color: #888;
+      white-space: nowrap;
     }
   </style>
 </head>
@@ -294,9 +244,11 @@
 
   <div class="arcade-machine">
     
-    <!-- 1. CRT MONITOR -->
+    <!-- CRT MONITOR -->
     <div class="monitor-bezel">
       <div class="crt-screen">
+        
+        <!-- OS Menu -->
         <div id="dos-menu">
           <div class="dos-header">FESTIVAL_OS.EXE<br>MEM OK...</div>
           <ul class="dos-list" id="game-list">
@@ -309,39 +261,42 @@
             <li>game7.html</li>
           </ul>
         </div>
+
+        <!-- The Game Player -->
         <iframe id="arcade-frame" title="Game Screen"></iframe>
       </div>
     </div>
 
-    <!-- 2. CONTROL DECK -->
+    <!-- CONTROL PAD -->
     <div class="control-deck">
-      <div class="joystick-base">
-        <div class="j-dir j-up" onmousedown="pressDpad('DPAD_UP')" ontouchstart="pressDpad('DPAD_UP')"></div>
-        <div class="j-dir j-right" onmousedown="pressDpad('DPAD_RIGHT')" ontouchstart="pressDpad('DPAD_RIGHT')"></div>
-        <div class="j-dir j-down" onmousedown="pressDpad('DPAD_DOWN')" ontouchstart="pressDpad('DPAD_DOWN')"></div>
-        <div class="j-dir j-left" onmousedown="pressDpad('DPAD_LEFT')" ontouchstart="pressDpad('DPAD_LEFT')"></div>
-        <div class="joystick-stick"></div>
+      
+      <!-- Directional Pad (Updated with data-dir attributes) -->
+      <div class="d-pad-container">
+        <div class="d-pad-btn d-up" data-dir="DPAD_UP"></div>
+        <div class="d-pad-btn d-right" data-dir="DPAD_RIGHT"></div>
+        <div class="d-pad-btn d-down" data-dir="DPAD_DOWN"></div>
+        <div class="d-pad-btn d-left" data-dir="DPAD_LEFT"></div>
+        <div class="d-center"></div>
       </div>
 
+      <!-- Center Home Button -->
+      <div class="home-container">
+        <div class="home-btn" onclick="btnHome()"></div>
+        <span class="home-label">HOME</span>
+      </div>
+
+      <!-- Action Buttons -->
       <div class="action-container">
         <div class="action-btn-wrapper">
           <div class="action-btn btn-b" onclick="btnAction('BUTTON_B')"></div>
-          <span class="btn-label">B</span>
+          <span class="btn-label">BUTTON B</span>
         </div>
         <div class="action-btn-wrapper">
           <div class="action-btn btn-a" onclick="btnAction('BUTTON_A')"></div>
-          <span class="btn-label">A</span>
+          <span class="btn-label">BUTTON A</span>
         </div>
       </div>
-    </div>
 
-    <!-- 3. FRONT PANEL -->
-    <div class="front-panel">
-      <div class="coin-door">
-        <div class="coin-btn" onclick="btnHome()">
-          <span class="coin-text">INSERT<br>COIN</span>
-        </div>
-      </div>
     </div>
 
   </div>
@@ -358,18 +313,10 @@
     const dosMenu = document.getElementById('dos-menu');
     const gameFrame = document.getElementById('arcade-frame');
 
+    // Helper: Broadcasts signal to the iframe
     function sendSignal(command) {
       if (isPlaying) {
         gameFrame.contentWindow.postMessage(command, '*');
-      }
-    }
-
-    function pressDpad(directionStr) {
-      if (isPlaying) {
-        sendSignal(directionStr);
-      } else {
-        if (directionStr === 'DPAD_UP') moveMenu(-1);
-        if (directionStr === 'DPAD_DOWN') moveMenu(1);
       }
     }
 
@@ -381,6 +328,50 @@
       listItems[currentIndex].classList.add('active');
     }
 
+    // --- NEW: JS Input Listeners for D-Pad ---
+    const joystickBtns = document.querySelectorAll('.d-pad-btn');
+
+    function handleDirectionPress(directionStr) {
+      if (isPlaying) {
+        sendSignal(directionStr);
+      } else {
+        // Menu navigation
+        if (directionStr === 'DPAD_UP') moveMenu(-1);
+        if (directionStr === 'DPAD_DOWN') moveMenu(1);
+      }
+    }
+
+    joystickBtns.forEach(btn => {
+      // TOUCH DEVICES
+      btn.addEventListener('touchstart', function(e) {
+        e.preventDefault(); 
+        handleDirectionPress(this.dataset.dir);
+        this.classList.add('stick-tilted'); 
+      }, {passive: false});
+
+      btn.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        this.classList.remove('stick-tilted'); 
+      });
+
+      // DESKTOP/MOUSE DEVICES
+      btn.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        handleDirectionPress(this.dataset.dir);
+        this.classList.add('stick-tilted');
+      });
+
+      btn.addEventListener('mouseup', function(e) {
+        e.preventDefault();
+        this.classList.remove('stick-tilted');
+      });
+
+      btn.addEventListener('mouseleave', function(e) {
+        this.classList.remove('stick-tilted');
+      });
+    });
+
+    // Action Buttons
     function btnAction(buttonStr) {
       if (isPlaying) {
         sendSignal(buttonStr);
@@ -394,9 +385,10 @@
       }
     }
 
+    // Home Button
     function btnHome() {
       if (isPlaying) {
-        gameFrame.src = ""; 
+        gameFrame.src = ""; // Unload game to save memory
         gameFrame.style.display = 'none';
         dosMenu.style.display = 'flex';
         isPlaying = false;
