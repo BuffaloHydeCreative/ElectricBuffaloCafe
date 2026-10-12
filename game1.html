@@ -76,11 +76,11 @@
     
     <div id="intro-screen" class="overlay">
       <h2>Red River Run</h2>
-      <p>Navigate the treacherous currents from the Red River valley, through the rocky shores of Lake Winnipeg, and into the frozen winter trails.<br><br>Use the D-PAD to dodge bright white debris and whirlpools!</p>
+      <p>Navigate the treacherous currents from The Forks of Upper Fort Garry, through the rocky shores of Lake Winnipeg, and into the frozen winter trails.<br><br>Move UP/DOWN to dodge dangerous rocks, driftwood & debris and whirlpools!</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
     
-    <div id="msg">CRASHED!<br><br>PRESS 'A' TO RESTART</div>
+    <div id="msg">YOU CRASHED!<br><br>PRESS 'A' TO RESTART</div>
   </div>
 </div>
 
@@ -251,27 +251,27 @@
       watCol = lerpColor(C_ACC1, C_LAKE, t);
       foamCol = lerpColor(C_ACC3, C_FOAM, t);
     } else if (score < 750) {
-      levelTitle = "LAKE WINNIPEG MOUTH";
+      levelTitle = "St. Peters";
       let t = (score - 500) / 250;
       gndCol = lerpColor(C_ACC2, '#284A41', t);
       watCol = C_LAKE;
       foamCol = C_FOAM;
     } else if (score < 1000) {
-      levelTitle = "MID-LAKE WINNIPEG";
+      levelTitle = "LAKE WINNIPEG";
       let t = (score - 750) / 250;
       skyCol = lerpColor(C_ACC3, C_NIGHT, t);
       gndCol = lerpColor('#284A41', C_BASE, t);
       watCol = lerpColor(C_LAKE, C_INDIGO, t);
       foamCol = C_FOAM;
     } else if (score < 1250) {
-      levelTitle = "MIDNIGHT LAKE";
+      levelTitle = "Northern Boreal Forest";
       let t = (score - 1000) / 250;
       skyCol = lerpColor(C_NIGHT, C_ACC3, t);
       gndCol = lerpColor(C_BASE, C_SNOW, t);
       watCol = lerpColor(C_INDIGO, C_ACC3, t);
       foamCol = lerpColor(C_FOAM, C_SNOW, t);
     } else {
-      levelTitle = "BOREAL WINTER TRAIL";
+      levelTitle = "Hudson Bay";
       skyCol = C_ACC3; gndCol = C_SNOW; watCol = C_ACC3; foamCol = C_SNOW;
     }
 
