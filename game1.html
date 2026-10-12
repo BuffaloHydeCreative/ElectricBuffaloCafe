@@ -243,15 +243,15 @@
     else if (level === 4) ctx.fillStyle = C_ACC3; // Ice path
     ctx.fillRect(0, 36, 160, 44);
 
-    // Current Lines / Snow Tracks
+    // Current Lines / Snow Tracks (Speed slowed by roughly half)
     if (level === 1) ctx.fillStyle = C_ACC3;
     else if (level === 2 || level === 3) ctx.fillStyle = C_FOAM;
     else if (level === 4) ctx.fillStyle = C_SNOW;
     
     for(let i=0; i<6; i++) {
-      ctx.fillRect((bgOffset + i*135) % 160, 42, 14, 2);
-      ctx.fillRect(((bgOffset*0.5) + i*40 + 20) % 160, 56, 10, 2);
-      ctx.fillRect(((bgOffset*1.2) + i*30 + 10) % 160, 70, 16, 2);
+      ctx.fillRect(((bgOffset * 0.5) + i*35) % 160, 42, 14, 2);
+      ctx.fillRect(((bgOffset * 0.55) + i*40 + 20) % 160, 56, 10, 2);
+      ctx.fillRect(((bgOffset * 0.6) + i*30 + 10) % 160, 70, 16, 2);
     }
 
     // Draw Obstacles
