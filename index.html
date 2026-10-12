@@ -12,15 +12,16 @@
       color: #fff; 
       font-family: 'Courier New', Courier, monospace; 
       display: flex; justify-content: center; align-items: center;
-      height: 100vh; overflow: hidden;
+      height: 100vh; width: 100vw;
+      overflow: hidden;
       touch-action: none; 
     }
 
-    /* Main 9:16 Mobile Arcade Cabinet */
+    /* Main Mobile Arcade Cabinet */
     .arcade-machine {
       width: 100%;
       max-width: 450px;
-      aspect-ratio: 9/16;
+      height: 100%;
       max-height: 100vh;
       background: #0d0d0d;
       border-radius: 20px;
@@ -30,19 +31,20 @@
       box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05);
       position: relative;
       overflow: hidden;
+      box-sizing: border-box;
     }
 
-    /* --- SECTION 1: CRT MONITOR (Angled Away) --- */
+    /* --- SECTION 1: CRT MONITOR (Dynamic Flex Height) --- */
     .monitor-bezel {
-      flex: 0 0 58%; /* Increased screen space */
+      flex: 1; /* Automatically takes all remaining vertical space */
+      min-height: 250px; /* Ensures the screen never gets too squished */
       background: linear-gradient(to bottom, #000 0%, #151515 100%);
-      padding: 15px 15px 5px 15px; /* Tighter padding to maximize screen */
+      padding: 15px 15px 5px 15px;
       box-sizing: border-box;
       display: flex;
       justify-content: center;
       align-items: center;
       position: relative;
-      /* Faux 3D inner shadow to simulate the deep monitor housing */
       box-shadow: inset 0 25px 35px rgba(0,0,0,0.9), inset 0 -5px 10px rgba(255,255,255,0.05);
     }
 
@@ -132,20 +134,20 @@
       box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
     }
 
-    /* --- SECTION 2: CONTROL DECK (Flat & Level) --- */
+    /* --- SECTION 2: CONTROL DECK (Fixed Height) --- */
     .control-deck {
-      flex: 0 0 25%;
-      /* Gradient simulates flat light hitting the panel */
+      flex: 0 0 160px; /* Locked height so controls never disappear */
       background: linear-gradient(to bottom, #2b2b2b 0%, #1a1a1a 15%, #111 100%);
-      border-top: 3px solid #666; /* Bright leading edge connecting to monitor */
-      border-bottom: 8px solid #000; /* Heavy drop-off lip connecting to front panel */
-      box-shadow: 0 15px 25px rgba(0,0,0,0.9); /* Shadows cast down onto the front panel */
+      border-top: 3px solid #666; 
+      border-bottom: 8px solid #000; 
+      box-shadow: 0 15px 25px rgba(0,0,0,0.9); 
       position: relative;
       padding: 0 25px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       z-index: 5;
+      box-sizing: border-box;
     }
 
     /* Digital Joystick */
@@ -169,14 +171,14 @@
     .j-left { top: 30px; left: 0; width: 60px; height: 60px; border-radius: 30px 0 0 30px; }
     .j-right { top: 30px; right: 0; width: 60px; height: 60px; border-radius: 0 30px 30px 0; }
 
-    /* The Stick Itself (Larger Ball) */
+    /* The Stick Itself */
     .joystick-stick {
-      width: 65px; /* Increased from 50px */
+      width: 65px; 
       height: 65px;
       background: radial-gradient(circle at 35% 35%, #888, #222);
       border-radius: 50%;
       position: absolute;
-      top: 27.5px; left: 27.5px; /* Perfectly centered */
+      top: 27.5px; left: 27.5px; 
       box-shadow: 8px 12px 15px rgba(0,0,0,0.6), inset -5px -5px 15px rgba(0,0,0,0.7);
       pointer-events: none;
       transition: transform 0.05s ease-out;
@@ -235,18 +237,18 @@
       color: #777;
     }
 
-    /* --- SECTION 3: FRONT PANEL (Straight Down) --- */
+    /* --- SECTION 3: FRONT PANEL (Fixed Height) --- */
     .front-panel {
-      flex: 1; /* Automatically takes the remaining ~17% */
+      flex: 0 0 90px; /* Locked height to guarantee coin door fits */
       background: linear-gradient(to bottom, #050505 0%, #111 100%);
       display: flex;
       justify-content: center;
       align-items: center;
       position: relative;
-      z-index: 4; /* Sits beneath the control deck shadow */
+      z-index: 4; 
     }
 
-    /* 90s Coin Insert Plate (Moved to Front Panel) */
+    /* 90s Coin Insert Plate */
     .coin-door {
       background: #1a1a1a;
       border: 3px solid #000;
@@ -292,12 +294,115 @@
 
   <div class="arcade-machine">
     
-    <!-- 1. CRT MONITOR (Angled Back) -->
+    <!-- 1. CRT MONITOR -->
     <div class="monitor-bezel">
       <div class="crt-screen">
-        
-        <!-- OS Menu -->
         <div id="dos-menu">
           <div class="dos-header">FESTIVAL_OS.EXE<br>MEM OK...</div>
           <ul class="dos-list" id="game-list">
-            <li class="active">game
+            <li class="active">game1.html</li>
+            <li>game2.html</li>
+            <li>game3.html</li>
+            <li>game4.html</li>
+            <li>game5.html</li>
+            <li>game6.html</li>
+            <li>game7.html</li>
+          </ul>
+        </div>
+        <iframe id="arcade-frame" title="Game Screen"></iframe>
+      </div>
+    </div>
+
+    <!-- 2. CONTROL DECK -->
+    <div class="control-deck">
+      <div class="joystick-base">
+        <div class="j-dir j-up" onmousedown="pressDpad('DPAD_UP')" ontouchstart="pressDpad('DPAD_UP')"></div>
+        <div class="j-dir j-right" onmousedown="pressDpad('DPAD_RIGHT')" ontouchstart="pressDpad('DPAD_RIGHT')"></div>
+        <div class="j-dir j-down" onmousedown="pressDpad('DPAD_DOWN')" ontouchstart="pressDpad('DPAD_DOWN')"></div>
+        <div class="j-dir j-left" onmousedown="pressDpad('DPAD_LEFT')" ontouchstart="pressDpad('DPAD_LEFT')"></div>
+        <div class="joystick-stick"></div>
+      </div>
+
+      <div class="action-container">
+        <div class="action-btn-wrapper">
+          <div class="action-btn btn-b" onclick="btnAction('BUTTON_B')"></div>
+          <span class="btn-label">B</span>
+        </div>
+        <div class="action-btn-wrapper">
+          <div class="action-btn btn-a" onclick="btnAction('BUTTON_A')"></div>
+          <span class="btn-label">A</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. FRONT PANEL -->
+    <div class="front-panel">
+      <div class="coin-door">
+        <div class="coin-btn" onclick="btnHome()">
+          <span class="coin-text">INSERT<br>COIN</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentIndex = 0;
+    const games = [
+      'game1.html', 'game2.html', 'game3.html', 
+      'game4.html', 'game5.html', 'game6.html', 'game7.html'
+    ];
+    let isPlaying = false;
+
+    const listItems = document.querySelectorAll('#game-list li');
+    const dosMenu = document.getElementById('dos-menu');
+    const gameFrame = document.getElementById('arcade-frame');
+
+    function sendSignal(command) {
+      if (isPlaying) {
+        gameFrame.contentWindow.postMessage(command, '*');
+      }
+    }
+
+    function pressDpad(directionStr) {
+      if (isPlaying) {
+        sendSignal(directionStr);
+      } else {
+        if (directionStr === 'DPAD_UP') moveMenu(-1);
+        if (directionStr === 'DPAD_DOWN') moveMenu(1);
+      }
+    }
+
+    function moveMenu(direction) {
+      listItems[currentIndex].classList.remove('active');
+      currentIndex += direction;
+      if (currentIndex < 0) currentIndex = games.length - 1;
+      if (currentIndex >= games.length) currentIndex = 0;
+      listItems[currentIndex].classList.add('active');
+    }
+
+    function btnAction(buttonStr) {
+      if (isPlaying) {
+        sendSignal(buttonStr);
+      } else {
+        if (buttonStr === 'BUTTON_A') {
+          dosMenu.style.display = 'none';
+          gameFrame.style.display = 'block';
+          gameFrame.src = games[currentIndex];
+          isPlaying = true;
+        }
+      }
+    }
+
+    function btnHome() {
+      if (isPlaying) {
+        gameFrame.src = ""; 
+        gameFrame.style.display = 'none';
+        dosMenu.style.display = 'flex';
+        isPlaying = false;
+      }
+    }
+  </script>
+
+</body>
+</html>
