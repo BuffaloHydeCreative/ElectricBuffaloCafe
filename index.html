@@ -1,731 +1,397 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
   <meta charset="UTF-8">
-
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
   <title>Festival Arcade Mobile</title>
-
   <style>
-
     /* Global Reset & Base */
-
     body { 
-
       margin: 0; padding: 0; 
-
       background: #000; 
-
       color: #fff; 
-
       font-family: 'Courier New', Courier, monospace; 
-
       display: flex; justify-content: center; align-items: center;
-
       height: 100vh; overflow: hidden;
-
       touch-action: none; 
-
     }
-
-
 
     /* Main 9:16 Mobile Arcade Cabinet */
-
     .arcade-machine {
-
       width: 100%;
-
       max-width: 450px;
-
       aspect-ratio: 9/16;
-
       max-height: 100vh;
-
       background: #111;
-
       border-radius: 20px;
-
       border: 4px solid #333;
-
       display: flex;
-
       flex-direction: column;
-
       box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05);
-
       position: relative;
-
       overflow: hidden;
-
     }
-
-
 
     /* --- TOP HALF: CRT MONITOR --- */
-
     .monitor-bezel {
-
       flex: 0 0 50%;
-
       background: #050505;
-
       padding: 15px;
-
       border-bottom: 4px solid #222;
-
       box-sizing: border-box;
-
       display: flex;
-
       justify-content: center;
-
       align-items: center;
-
     }
-
-
 
     .crt-screen {
-
       width: 100%;
-
       height: 100%;
-
       background: #000;
-
       border-radius: 12px;
-
       position: relative;
-
       overflow: hidden;
-
       border: 6px solid #1a1a1a;
-
       box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
-
     }
-
-
 
     /* The DOS Style Menu Overlay */
-
     #dos-menu {
-
       position: absolute;
-
       top: 0; left: 0; width: 100%; height: 100%;
-
       background: #000;
-
       color: #33ff33;
-
       padding: 20px;
-
       box-sizing: border-box;
-
       display: flex;
-
       flex-direction: column;
-
       z-index: 10;
-
     }
-
-
 
     .dos-header {
-
       font-weight: bold;
-
       margin-bottom: 15px;
-
       border-bottom: 2px dashed #33ff33;
-
       padding-bottom: 5px;
-
     }
-
-
 
     .dos-list {
-
       list-style: none;
-
       padding: 0;
-
       margin: 0;
-
       display: flex;
-
       flex-direction: column;
-
       gap: 8px;
-
     }
-
-
 
     .dos-list li {
-
       font-size: 14px;
-
       text-transform: uppercase;
-
       opacity: 0.5;
-
     }
-
-
 
     .dos-list li.active {
-
       opacity: 1;
-
       font-weight: bold;
-
       background: #33ff33;
-
       color: #000;
-
     }
-
-
 
     .dos-list li::before {
-
       content: "  ";
-
       white-space: pre;
-
     }
-
-
 
     .dos-list li.active::before {
-
       content: "> ";
-
     }
-
-
 
     /* Game iFrame */
-
     #arcade-frame {
-
       width: 100%;
-
       height: 100%;
-
       border: none;
-
       display: none;
-
       position: absolute;
-
       top: 0; left: 0;
-
       z-index: 5;
-
     }
-
-
 
     /* CRT Scanline Overlay */
-
     .crt-screen::after {
-
       content: " ";
-
       display: block;
-
       position: absolute;
-
       top: 0; left: 0; bottom: 0; right: 0;
-
       background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-
       z-index: 20;
-
       background-size: 100% 3px, 3px 100%;
-
       pointer-events: none;
-
       box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
-
     }
-
-
 
     /* --- BOTTOM HALF: CONTROL PAD --- */
-
     .control-deck {
-
       flex: 1;
-
       background: #1e1e1e;
-
       position: relative;
-
       padding: 20px;
-
       display: flex;
-
       align-items: center;
-
       justify-content: space-between;
-
     }
 
-
-
-    /* D-Pad (Left Side) */
-
-    .d-pad-container {
-
+    /* --- NEW: DIGITAL JOYSTICK --- */
+    .joystick-base {
       width: 120px;
-
       height: 120px;
-
-      position: relative;
-
-    }
-
-    
-
-    .d-pad-btn {
-
-      position: absolute;
-
-      background: #333;
-
+      background: radial-gradient(circle, #1a1a1a 30%, #2a2a2a 100%);
+      border-radius: 50%;
       border: 4px solid #111;
+      box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 2px 5px rgba(255,255,255,0.05);
+      position: relative;
+    }
 
-      border-radius: 4px;
-
+    /* Invisible Hit Zones */
+    .j-dir {
+      position: absolute;
+      z-index: 2;
       cursor: pointer;
+    }
+    .j-up { top: 0; left: 30px; width: 60px; height: 60px; border-radius: 30px 30px 0 0; }
+    .j-down { bottom: 0; left: 30px; width: 60px; height: 60px; border-radius: 0 0 30px 30px; }
+    .j-left { top: 30px; left: 0; width: 60px; height: 60px; border-radius: 30px 0 0 30px; }
+    .j-right { top: 30px; right: 0; width: 60px; height: 60px; border-radius: 0 30px 30px 0; }
 
-      box-shadow: 0 4px 0 #000;
-
+    /* The Stick Itself */
+    .joystick-stick {
+      width: 50px;
+      height: 50px;
+      background: radial-gradient(circle at 35% 35%, #777, #333);
+      border-radius: 50%;
+      position: absolute;
+      top: 35px; left: 35px;
+      box-shadow: 8px 12px 15px rgba(0,0,0,0.6), inset -5px -5px 15px rgba(0,0,0,0.7);
+      pointer-events: none;
+      transition: transform 0.05s ease-out;
+      z-index: 1;
     }
 
+    /* CSS Magic: Stick moves when hit zones are active */
+    .j-up:active ~ .joystick-stick { transform: translateY(-15px); box-shadow: 8px 25px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    .j-down:active ~ .joystick-stick { transform: translateY(15px); box-shadow: 8px 0px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    .j-left:active ~ .joystick-stick { transform: translateX(-15px); box-shadow: 20px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
+    .j-right:active ~ .joystick-stick { transform: translateX(15px); box-shadow: -5px 12px 15px rgba(0,0,0,0.5), inset -5px -5px 15px rgba(0,0,0,0.7); }
 
-
-    .d-pad-btn:active {
-
-      transform: translateY(4px);
-
-      box-shadow: 0 0 0 #000;
-
-      background: #444;
-
-    }
-
-
-
-    .d-up { top: 0; left: 40px; width: 40px; height: 45px; border-bottom: none; border-radius: 8px 8px 0 0; }
-
-    .d-down { bottom: 0; left: 40px; width: 40px; height: 45px; border-top: none; border-radius: 0 0 8px 8px; }
-
-    .d-left { top: 40px; left: 0; width: 45px; height: 40px; border-right: none; border-radius: 8px 0 0 8px; }
-
-    .d-right { top: 40px; right: 0; width: 45px; height: 40px; border-left: none; border-radius: 0 8px 8px 0; }
-
-    .d-center { top: 40px; left: 40px; width: 40px; height: 40px; background: #333; border: none; }
-
-
-
-    /* Center Home Button */
-
-    .home-container {
-
+    /* --- NEW: 90s COIN INSERT (HOME) --- */
+    .coin-container {
       display: flex;
-
       flex-direction: column;
-
       align-items: center;
-
-      gap: 5px;
-
-      margin-top: 40px;
-
+      margin-top: 35px;
     }
 
-
-
-    .home-btn {
-
+    .coin-btn {
       width: 45px;
-
-      height: 20px;
-
-      background: #555;
-
-      border-radius: 10px;
-
-      border: 3px solid #111;
-
+      height: 60px;
+      background: rgba(230, 60, 20, 0.85); /* Burnt orange / semi-transparent */
+      border: 3px solid #050505;
+      border-radius: 6px;
       cursor: pointer;
-
-      box-shadow: 0 4px 0 #000;
-
-    }
-
-
-
-    .home-btn:active {
-
-      transform: translateY(4px);
-
-      box-shadow: 0 0 0 #000;
-
-    }
-
-
-
-    .home-label {
-
-      font-size: 10px;
-
-      font-weight: bold;
-
-      color: #888;
-
-      letter-spacing: 1px;
-
-    }
-
-
-
-    /* Action Buttons (Right Side) */
-
-    .action-container {
-
+      box-shadow: inset 0 0 12px rgba(255,180,100,0.6), inset 0 0 4px rgba(0,0,0,0.8), 0 4px 0 #000;
       display: flex;
-
-      gap: 15px;
-
-      transform: rotate(-15deg); 
-
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      position: relative;
     }
 
+    .coin-btn:active {
+      transform: translateY(4px);
+      box-shadow: inset 0 0 12px rgba(255,180,100,0.6), inset 0 0 4px rgba(0,0,0,0.8), 0 0 0 #000;
+    }
 
+    .coin-text {
+      font-family: Arial, sans-serif;
+      font-weight: 900; 
+      font-size: 8px;
+      color: rgba(255, 255, 255, 0.95);
+      text-shadow: 0 0 4px rgba(255,255,255,0.6);
+      line-height: 1.2;
+    }
+
+    /* --- NEW: CONCAVE ACTION BUTTONS --- */
+    .action-container {
+      display: flex;
+      gap: 15px;
+      transform: rotate(-15deg); 
+    }
 
     .action-btn-wrapper {
-
       display: flex;
-
       flex-direction: column;
-
       align-items: center;
-
-      gap: 8px;
-
+      gap: 12px;
     }
-
-
 
     .action-btn {
-
-      width: 50px;
-
-      height: 50px;
-
+      width: 55px;
+      height: 55px;
       border-radius: 50%;
-
-      border: 4px solid #111;
-
+      border: 3px solid #111;
       cursor: pointer;
-
-      box-shadow: 0 6px 0 #000;
-
+      position: relative;
+      /* Concave shadow styling */
+      box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 6px 0 #050505, 0 10px 15px rgba(0,0,0,0.6);
     }
-
-
+    
+    /* Top plastic gloss reflection */
+    .action-btn::after {
+      content: '';
+      position: absolute;
+      top: 4px; left: 10px; right: 10px; height: 18px;
+      background: linear-gradient(rgba(255,255,255,0.25), transparent);
+      border-radius: 20px 20px 0 0;
+      pointer-events: none;
+    }
 
     .action-btn:active {
-
       transform: translateY(6px);
-
-      box-shadow: 0 0 0 #000;
-
+      box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 0 0 #050505, 0 4px 6px rgba(0,0,0,0.6);
     }
 
-
-
-    .btn-b { background: #ffcc00; margin-top: 25px; }
-
-    .btn-a { background: #e60000; }
-
-
+    /* Deep base colors for the gradient overlay */
+    .btn-b { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #e0a800; margin-top: 25px; }
+    .btn-a { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #cc0000; }
 
     .btn-label {
-
       font-size: 12px;
-
       font-weight: bold;
-
-      color: #888;
-
-      white-space: nowrap;
-
+      color: #777;
     }
-
   </style>
-
 </head>
-
 <body>
 
-
-
   <div class="arcade-machine">
-
     
-
     <!-- CRT MONITOR -->
-
     <div class="monitor-bezel">
-
       <div class="crt-screen">
-
         
-
         <!-- OS Menu -->
-
         <div id="dos-menu">
-
           <div class="dos-header">FESTIVAL_OS.EXE<br>MEM OK...</div>
-
           <ul class="dos-list" id="game-list">
-
             <li class="active">game1.html</li>
-
             <li>game2.html</li>
-
             <li>game3.html</li>
-
             <li>game4.html</li>
-
             <li>game5.html</li>
-
             <li>game6.html</li>
-
             <li>game7.html</li>
-
           </ul>
-
         </div>
-
-
 
         <!-- The Game Player -->
-
         <iframe id="arcade-frame" title="Game Screen"></iframe>
-
       </div>
-
     </div>
-
-
 
     <!-- CONTROL PAD -->
-
     <div class="control-deck">
-
       
-
-      <!-- Directional Pad -->
-
-      <div class="d-pad-container">
-
-        <div class="d-pad-btn d-up" onclick="pressDpad('DPAD_UP')"></div>
-
-        <div class="d-pad-btn d-right" onclick="pressDpad('DPAD_RIGHT')"></div>
-
-        <div class="d-pad-btn d-down" onclick="pressDpad('DPAD_DOWN')"></div>
-
-        <div class="d-pad-btn d-left" onclick="pressDpad('DPAD_LEFT')"></div>
-
-        <div class="d-center"></div>
-
+      <!-- Digital Joystick -->
+      <div class="joystick-base">
+        <!-- Invisible hit zones driving CSS stick movement -->
+        <div class="j-dir j-up" onmousedown="pressDpad('DPAD_UP')" ontouchstart="pressDpad('DPAD_UP')"></div>
+        <div class="j-dir j-right" onmousedown="pressDpad('DPAD_RIGHT')" ontouchstart="pressDpad('DPAD_RIGHT')"></div>
+        <div class="j-dir j-down" onmousedown="pressDpad('DPAD_DOWN')" ontouchstart="pressDpad('DPAD_DOWN')"></div>
+        <div class="j-dir j-left" onmousedown="pressDpad('DPAD_LEFT')" ontouchstart="pressDpad('DPAD_LEFT')"></div>
+        <div class="joystick-stick"></div>
       </div>
 
-
-
-      <!-- Center Home Button -->
-
-      <div class="home-container">
-
-        <div class="home-btn" onclick="btnHome()"></div>
-
-        <span class="home-label">HOME</span>
-
+      <!-- Coin Insert (Home) Button -->
+      <div class="coin-container">
+        <div class="coin-btn" onclick="btnHome()">
+          <span class="coin-text">INSERT<br>COIN</span>
+        </div>
       </div>
-
-
 
       <!-- Action Buttons -->
-
       <div class="action-container">
-
         <div class="action-btn-wrapper">
-
           <div class="action-btn btn-b" onclick="btnAction('BUTTON_B')"></div>
-
-          <span class="btn-label">BUTTON B</span>
-
+          <span class="btn-label">B</span>
         </div>
-
         <div class="action-btn-wrapper">
-
           <div class="action-btn btn-a" onclick="btnAction('BUTTON_A')"></div>
-
-          <span class="btn-label">BUTTON A</span>
-
+          <span class="btn-label">A</span>
         </div>
-
       </div>
 
-
-
     </div>
-
-
 
   </div>
 
-
-
   <script>
-
     let currentIndex = 0;
-
     const games = [
-
       'game1.html', 'game2.html', 'game3.html', 
-
       'game4.html', 'game5.html', 'game6.html', 'game7.html'
-
     ];
-
     let isPlaying = false;
 
-
-
     const listItems = document.querySelectorAll('#game-list li');
-
     const dosMenu = document.getElementById('dos-menu');
-
     const gameFrame = document.getElementById('arcade-frame');
 
-
-
-    // Helper: Broadcasts signal to the iframe
-
     function sendSignal(command) {
-
       if (isPlaying) {
-
         gameFrame.contentWindow.postMessage(command, '*');
-
       }
-
     }
-
-
-
-    // D-Pad Control
 
     function pressDpad(directionStr) {
-
       if (isPlaying) {
-
         sendSignal(directionStr);
-
       } else {
-
         if (directionStr === 'DPAD_UP') moveMenu(-1);
-
         if (directionStr === 'DPAD_DOWN') moveMenu(1);
-
       }
-
     }
-
-
 
     function moveMenu(direction) {
-
       listItems[currentIndex].classList.remove('active');
-
       currentIndex += direction;
-
       if (currentIndex < 0) currentIndex = games.length - 1;
-
       if (currentIndex >= games.length) currentIndex = 0;
-
       listItems[currentIndex].classList.add('active');
-
     }
-
-
-
-    // Action Buttons
 
     function btnAction(buttonStr) {
-
       if (isPlaying) {
-
         sendSignal(buttonStr);
-
       } else {
-
         if (buttonStr === 'BUTTON_A') {
-
           dosMenu.style.display = 'none';
-
           gameFrame.style.display = 'block';
-
           gameFrame.src = games[currentIndex];
-
           isPlaying = true;
-
         }
-
       }
-
     }
-
-
-
-    // Home Button
 
     function btnHome() {
-
       if (isPlaying) {
-
-        gameFrame.src = ""; // Unload game to save memory
-
+        gameFrame.src = ""; 
         gameFrame.style.display = 'none';
-
         dosMenu.style.display = 'flex';
-
         isPlaying = false;
-
       }
-
     }
-
   </script>
 
-
-
 </body>
-
-</html> 
+</html>
