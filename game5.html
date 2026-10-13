@@ -83,12 +83,12 @@
   const ROWS = 10;
   const COLS = 10;
   
-  // Optimized high-contrast palette
+  // Reversed progression: Mountains to Woodlands[cite: 2]
   const BIOMES = [
-    { name: "EASTERN WOODLANDS", bg: '#1A3311', detail: '#2D4A22', type: 'forest' },
-    { name: "TALL GRASS PRAIRIE", bg: '#8A681A', detail: '#A88022', type: 'grass' },
+    { name: "ROCKY FOOTHILLS", bg: '#455A64', detail: '#607D8B', type: 'mountain' },
     { name: "DRY PRAIRIE", bg: '#5D4037', detail: '#795548', type: 'desert' },
-    { name: "ROCKY FOOTHILLS", bg: '#455A64', detail: '#607D8B', type: 'mountain' }
+    { name: "TALL GRASS PRAIRIE", bg: '#8A681A', detail: '#A88022', type: 'grass' },
+    { name: "EASTERN WOODLANDS", bg: '#1A3311', detail: '#2D4A22', type: 'forest' }
   ];
 
   let state = 'START'; 
@@ -98,7 +98,7 @@
   let frame = 0;
   let bgScrollY = 0;
   
-  let player = { x: 110, y: 200, dead: false, w: 16, h: 20 };
+  let player = { x: 110, y: 200, dead: false, w: 16, h: 16 };
   let obstacles = [];
   let buffaloes = [];
   let baseSpeed = 1.0;
@@ -124,7 +124,7 @@
     [1,4,4,4,4,4,4,1],
     [0,1,4,0,4,4,1,0],
     [0,1,0,0,4,0,1,0]
-  ]; // 1:Outline, 2:Skin, 3:Coat, 4:Horse
+  ]; 
 
   const sprBuffalo = [
     [0,0,1,1,1,1,0,0],
@@ -134,7 +134,7 @@
     [1,2,2,2,2,2,2,1],
     [1,2,1,2,2,1,2,1],
     [0,1,0,1,1,0,1,0]
-  ]; // 1:Outline, 2:Fur, 3:Eye
+  ]; 
 
   const sprPelt = [
     [0,1,1,1,1,0],
@@ -142,15 +142,14 @@
     [1,2,3,2,2,1],
     [1,2,2,2,2,1],
     [0,1,1,1,1,0]
-  ]; // 1:#000, 2:Gold, 3:White Sparkle
+  ]; 
 
   const sprRock = [[0,0,1,1,1,0,0],[0,1,2,2,2,1,0],[1,2,3,2,3,2,1],[1,2,2,2,2,2,1],[1,1,1,1,1,1,1]]; 
-  // Adjusted tree to be larger intrinsically and we will scale it 1.5x larger than others
   const sprTree = [[0,0,0,1,1,0,0,0],[0,0,1,2,2,1,0,0],[0,1,2,3,2,2,1,0],[1,2,2,2,3,2,2,1],[1,2,3,2,2,2,2,1],[1,2,2,2,2,2,2,1],[0,0,1,4,4,1,0,0],[0,0,1,4,4,1,0,0]]; 
   const sprFox = [[0,0,0,1,0,0],[0,1,1,2,1,1],[1,2,3,2,3,2,1],[1,2,2,2,2,1,0],[0,1,1,0,1,1,0]]; 
 
   function spawnObstacle() {
-    let spawnRate = Math.max(50, 120 - (level * 10)); // Slower side-loaded objects
+    let spawnRate = Math.max(50, 120 - (level * 10)); 
     if (frame % spawnRate === 0) {
       let bIdx = (level - 1) % BIOMES.length;
       let typeList = [];
@@ -160,20 +159,19 @@
 
       let type = typeList[Math.floor(Math.random() * typeList.length)];
       
-      // 25% chance to spawn a pelt instead of a regular obstacle
       if (Math.random() < 0.25) type = 'pelt';
 
-      let x = Math.random() * (cvs.width - 30);
+      let x = Math.random() * (cvs.width - 40);
       let dx = (type === 'fox') ? (Math.random() > 0.5 ? 0.4 : -0.4) : 0;
       let dy = baseSpeed + (Math.random() * 0.4);
 
-      // Distinct scaling sizes[cite: 1]
-      let w = 14, h = 14, scale = 2;
-      if (type === 'tree') { w = 24; h = 24; scale = 3; } 
-      if (type === 'pelt') { w = 12; h = 10; scale = 2; }
-      if (type === 'fox') { w = 12; h = 10; scale = 2; }
+      // Doubled object scales, pelt stays the same 
+      let w = 28, h = 20, scale = 4; // default rock size scaled 4x
+      if (type === 'tree') { w = 48; h = 48; scale = 6; } 
+      if (type === 'fox') { w = 24; h = 20; scale = 4; }
+      if (type === 'pelt') { w = 12; h = 10; scale = 2; } // Keep pelt size same
 
-      obstacles.push({ x: x, y: -30, dx: dx, dy: dy, type: type, w: w, h: h, scale: scale, dead: false });
+      obstacles.push({ x: x, y: -50, dx: dx, dy: dy, type: type, w: w, h: h, scale: scale, dead: false });
     }
   }
 
@@ -222,9 +220,13 @@
         obs.x += obs.dx;
         obs.y += obs.dy;
 
-        // Bounding box collision
-        if (!obs.dead && player.x < obs.x + obs.w && player.x + player.w > obs.x &&
-            player.y < obs.y + obs.h && player.y + player.h > obs.y) {
+        // Bounding box collision (forgiving inset)
+        let inset = (obs.type === 'pelt') ? 0 : 4;
+        if (!obs.dead && 
+            player.x + 2 < obs.x + obs.w - inset && 
+            player.x + player.w - 2 > obs.x + inset &&
+            player.y + 2 < obs.y + obs.h - inset && 
+            player.y + player.h - 2 > obs.y + inset) {
           
           if (obs.type === 'pelt') {
             peltsCollected++;
@@ -232,7 +234,7 @@
             updateScore();
             if (peltsCollected >= 10) {
               level++;
-              initLevel(true); // Always rumble on new level
+              initLevel(true); 
             }
           } else {
             state = 'GAMEOVER';
@@ -265,7 +267,6 @@
     let bIdx = (level - 1) % BIOMES.length;
     let b = BIOMES[bIdx];
 
-    // Racing Ground Illusion
     ctx.fillStyle = b.bg;
     ctx.fillRect(0, 0, cvs.width, cvs.height);
     
@@ -278,7 +279,7 @@
       }
     }
 
-    // Obstacles
+    // Draw Obstacles (scaled up)
     obstacles.forEach(obs => {
       let pal, spr;
       if (obs.type === 'rock') { spr = sprRock; pal = {1:'#212121', 2:'#757575', 3:'#E0E0E0'}; }
@@ -290,13 +291,12 @@
 
     // Player
     if (state !== 'GAMEOVER' || frame % 10 < 5) { 
-      drawSprite(player.x, player.y, sprPlayer, {1:'#000', 2:'#D4D0C5', 3:'#0F6F9E', 4:'#5D4037'});
+      drawSprite(player.x, player.y, sprPlayer, {1:'#000', 2:'#D4D0C5', 3:'#0F6F9E', 4:'#5D4037'}, 2);
     }
 
-    // Rumble Buffalo
     if (state === 'TRANSITION') {
       buffaloes.forEach(buf => {
-        drawSprite(buf.x, buf.y, sprBuffalo, {1:'#000', 2:'#3E2723', 3:'#AD1C21'});
+        drawSprite(buf.x, buf.y, sprBuffalo, {1:'#000', 2:'#3E2723', 3:'#AD1C21'}, 4);
       });
     }
 
@@ -311,7 +311,6 @@
 
   function move(dx, dy) {
     if (state !== 'PLAYING') return;
-    // Increased movement step to cover more ground per discrete tap[cite: 1]
     let spd = 20; 
     let nx = player.x + (dx * spd);
     let ny = player.y + (dy * spd);
