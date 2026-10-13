@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Metis Buffalo Hunter</title>
+<title>Land Thunder!</title>
 <style>
   body {
     margin: 0; padding: 0;
@@ -52,16 +52,16 @@
 <body>
 <div id="game-container">
   <div id="header">
-    <span id="title-display">METIS BUFFALO HUNTER</span>
+    <span id="title-display">LAND THUNDER!</span>
     <span id="score-display">LEVEL: 1</span>
   </div>
   
   <div id="screen-container">
-    <canvas id="gameCanvas" width="320" height="320"></canvas>
+    <canvas id="gameCanvas" width="240" height="240"></canvas>
     
     <div id="intro-screen" class="overlay">
-      <h2>BUFFALO HUNTER</h2>
-      <p>Ride West across the lands.<br>Dodge wildlife and obstacles.<br>Reach the top to advance!<br><br>Use D-PAD to move.</p>
+      <h2>LAND THUNDER!</h2>
+      <p>Race North across the changing lands.<br>Dodge wildlife and oncoming obstacles.<br>Survive to advance the biome!</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
     
@@ -79,35 +79,39 @@
   const msgScreen = document.getElementById('msg');
   const scoreDisplay = document.getElementById('score-display');
   
-  const TILE = 32;
+  // Adjusted for top-down racing view
+  const TILE = 24; 
   const ROWS = 10;
   const COLS = 10;
   
-  // Biome Palettes
   const BIOMES = [
-    { name: "EASTERN WOODLANDS", bg: '#2D4A22', water: '#0F6F9E', safe: '#1A3311' },
-    { name: "TALL GRASS PRAIRIE", bg: '#C29B38', water: '#12AEA2', safe: '#A88022' },
-    { name: "DRY PRAIRIE", bg: '#A37A57', water: '#A37A57', safe: '#825D3E' },
-    { name: "ROCKY FOOTHILLS", bg: '#6B7A7A', water: '#4A5959', safe: '#4F5C5C' }
+    { name: "EASTERN WOODLANDS", bg: '#2D4A22', detail: '#1A3311', type: 'forest' },
+    { name: "TALL GRASS PRAIRIE", bg: '#C29B38', detail: '#A88022', type: 'grass' },
+    { name: "DRY PRAIRIE", bg: '#A37A57', detail: '#825D3E', type: 'desert' },
+    { name: "ROCKY FOOTHILLS", bg: '#6B7A7A', detail: '#4F5C5C', type: 'mountain' }
   ];
 
-  let state = 'START'; // START, PLAYING, TRANSITION, GAMEOVER
+  let state = 'START'; 
   let level = 1;
   let shakeFrames = 0;
   let frame = 0;
+  let bgScrollY = 0;
   
-  let player = { x: 4, y: 9, dead: false };
-  let lanes = [];
+  let player = { x: 120, y: 200, dead: false, w: 16, h: 20 };
+  let obstacles = [];
   let buffaloes = [];
+  let baseSpeed = 1.0;
+  let distance = 0;
+  let levelDistance = 1500;
 
-  // Minimal 8x8 Sprites (scaled to 32x32)
-  const drawSprite = (x, y, matrix, colors) => {
-    const s = TILE / 8;
-    for(let r=0; r<8; r++) {
-      for(let c=0; c<8; c++) {
+  // NES-style Pseudo-3D Sprites (16x16 scaled)
+  const drawSprite = (x, y, matrix, palette) => {
+    const s = 2; // pixel scale
+    for(let r=0; r<matrix.length; r++) {
+      for(let c=0; c<matrix[r].length; c++) {
         let v = matrix[r][c];
-        if(v > 0) {
-          ctx.fillStyle = colors[v];
+        if(v > 0 && palette[v]) {
+          ctx.fillStyle = palette[v];
           ctx.fillRect(x + c*s, y + r*s, s, s);
         }
       }
@@ -115,78 +119,75 @@
   };
 
   const sprPlayer = [
-    [0,0,0,1,1,0,0,0],
-    [0,0,2,2,2,0,0,0],
-    [0,3,3,3,3,3,0,0],
-    [0,4,3,2,3,4,4,0],
-    [4,4,4,4,4,4,4,4],
-    [0,4,4,4,4,4,4,0],
-    [0,4,0,4,4,0,4,0],
-    [0,4,0,4,4,0,4,0]
-  ]; // 1: Hat, 2: Skin, 3: Coat/Shirt, 4: Horse
+    [0,0,0,1,1,1,0,0],
+    [0,0,1,2,2,2,1,0],
+    [0,1,3,3,3,3,3,1],
+    [1,4,3,2,3,4,4,1],
+    [1,4,4,4,4,4,4,1],
+    [1,4,4,4,4,4,4,1],
+    [0,1,4,0,4,4,1,0],
+    [0,1,0,0,4,0,1,0]
+  ]; // 1:Outline, 2:Skin, 3:Coat, 4:Horse
 
   const sprBuffalo = [
     [0,0,1,1,1,1,0,0],
-    [0,1,1,1,1,1,1,0],
-    [1,1,1,1,1,1,1,1],
-    [1,2,1,1,1,1,1,1],
-    [1,1,1,1,1,1,1,1],
-    [0,1,1,1,1,1,1,0],
-    [0,1,0,1,1,0,1,0],
+    [0,1,2,2,2,2,1,0],
+    [1,2,2,2,2,2,2,1],
+    [1,3,2,2,2,2,3,1],
+    [1,2,2,2,2,2,2,1],
+    [1,2,1,2,2,1,2,1],
     [0,1,0,1,1,0,1,0]
-  ]; // 1: Fur, 2: Eye
+  ]; // 1:Outline, 2:Fur, 3:Eye
 
-  const sprObstacles = {
-    'log': { m: [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[1,1,1,1,1,1,1,1],[1,2,2,2,2,2,1,1],[1,1,1,1,1,1,1,1],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], c: {1:'#3E2723', 2:'#5D4037'} },
-    'rock': { m: [[0,0,0,0,0,0,0,0],[0,0,0,1,1,0,0,0],[0,0,1,2,2,1,0,0],[0,1,2,2,2,2,1,0],[1,2,2,2,2,2,2,1],[1,2,2,2,2,2,2,1],[1,1,1,1,1,1,1,1],[0,0,0,0,0,0,0,0]], c: {1:'#424242', 2:'#757575'} },
-    'bear': { m: [[0,0,0,0,0,0,0,0],[0,1,0,0,0,0,1,0],[1,1,1,1,1,1,1,1],[1,2,1,1,1,1,2,1],[1,1,1,1,1,1,1,1],[0,1,1,1,1,1,1,0],[0,1,0,1,1,0,1,0],[0,1,0,0,0,0,1,0]], c: {1:'#212121', 2:'#fff'} },
-    'fox':  { m: [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,1,0,0,0,0,1,0],[0,1,1,1,1,1,1,0],[1,1,2,1,1,2,1,1],[1,1,1,1,1,1,1,1],[0,1,0,1,1,0,1,0],[0,1,0,0,0,0,1,0]], c: {1:'#E65100', 2:'#fff'} },
-    'fish': { m: [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,1,0,0,0,0,0,0],[1,1,1,1,1,1,0,0],[1,1,2,1,1,1,1,1],[1,1,1,1,1,1,0,0],[0,1,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], c: {1:'#00BCD4', 2:'#fff'} },
-    'tree': { m: [[0,0,0,1,1,0,0,0],[0,0,1,1,1,1,0,0],[0,1,1,1,1,1,1,0],[0,1,1,1,1,1,1,0],[0,0,1,1,1,1,0,0],[0,0,0,2,2,0,0,0],[0,0,0,2,2,0,0,0],[0,0,0,2,2,0,0,0]], c: {1:'#2E7D32', 2:'#5D4037'} }
-  };
+  const sprRock = [[0,0,1,1,1,0,0],[0,1,2,2,2,1,0],[1,2,3,2,3,2,1],[1,2,2,2,2,2,1],[1,1,1,1,1,1,1]]; // 1:Out, 2:Base, 3:Highlight
+  const sprTree = [[0,0,1,1,1,0,0],[0,1,2,2,2,1,0],[1,2,3,2,3,2,1],[1,2,2,2,2,2,1],[0,0,1,4,1,0,0],[0,0,1,4,1,0,0]]; // 2:Green, 3:LightGreen, 4:Trunk
+  const sprFox = [[0,0,0,1,0,0],[0,1,1,2,1,1],[1,2,3,2,3,2,1],[1,2,2,2,2,1,0],[0,1,1,0,1,1,0]]; // 2:Orange, 3:White
 
-  function initLevel() {
-    let bIdx = (level - 1) % BIOMES.length;
-    let speedMult = 1 + (level * 0.15);
-    lanes = [];
-    
-    // Create Frogger rows (1 to 8)
-    for (let i = 1; i < ROWS - 1; i++) {
-      let isWater = (bIdx < 2 && (i === 2 || i === 3 || i === 6));
-      let dir = (i % 2 === 0) ? 1 : -1;
-      let spd = (1 + Math.random() * 1.5) * speedMult;
+  function spawnObstacle() {
+    // Slower spawn rate and speed on early levels[cite: 1]
+    let spawnRate = Math.max(40, 100 - (level * 10));
+    if (frame % spawnRate === 0) {
+      let bIdx = (level - 1) % BIOMES.length;
+      let typeList = [];
+      if (BIOMES[bIdx].type === 'forest') typeList = ['tree', 'rock', 'fox'];
+      else if (BIOMES[bIdx].type === 'grass') typeList = ['rock', 'fox'];
+      else typeList = ['rock'];
+
+      let type = typeList[Math.floor(Math.random() * typeList.length)];
+      let x = Math.random() * (cvs.width - 20);
       
-      let type;
-      if (isWater) type = Math.random() > 0.5 ? 'log' : 'fish';
-      else {
-        if (bIdx === 0) type = Math.random() > 0.5 ? 'bear' : 'tree';
-        else if (bIdx === 1) type = Math.random() > 0.5 ? 'fox' : 'rock';
-        else if (bIdx === 2) type = Math.random() > 0.5 ? 'fox' : 'rock';
-        else type = Math.random() > 0.5 ? 'bear' : 'rock';
-      }
+      // Some objects drift horizontally (wildlife), others just fall straight down
+      let dx = (type === 'fox') ? (Math.random() > 0.5 ? 0.5 : -0.5) : 0;
+      let dy = baseSpeed + (Math.random() * 0.5);
 
-      let ents = [];
-      let count = Math.floor(Math.random() * 2) + 2; // 2 to 3 objects per lane
-      for (let j = 0; j < count; j++) {
-        ents.push({ x: j * (COLS / count) * TILE, type: type });
-      }
-
-      lanes.push({ y: i, dir: dir, spd: spd, isWater: isWater, ents: ents });
+      obstacles.push({ x: x, y: -20, dx: dx, dy: dy, type: type, w: 14, h: 14 });
     }
-    
-    player = { x: 4, y: 9, dead: false };
-    scoreDisplay.innerText = `LEVEL: ${level} - ${BIOMES[bIdx].name}`;
   }
 
-  function triggerTransition() {
+  function initLevel(initialRumble = false) {
+    let bIdx = (level - 1) % BIOMES.length;
+    baseSpeed = 1.2 + (level * 0.2); // Slower initial speed
+    distance = 0;
+    obstacles = [];
+    player = { x: 110, y: 200, dead: false, w: 16, h: 16 };
+    scoreDisplay.innerText = `LEVEL: ${level} - ${BIOMES[bIdx].name}`;
+    
+    if (initialRumble || level % 2 === 1) {
+      triggerRumble();
+    } else {
+      state = 'PLAYING';
+    }
+  }
+
+  function triggerRumble() {
     state = 'TRANSITION';
-    shakeFrames = 120; // 2 seconds at 60fps
+    shakeFrames = 100;
     buffaloes = [];
-    for(let i=0; i<15; i++) {
+    for(let i=0; i<20; i++) {
       buffaloes.push({
-        x: Math.random() * (cvs.width + 100) - 50,
-        y: -Math.random() * 200,
-        spd: 3 + Math.random() * 4
+        x: Math.random() * cvs.width,
+        y: cvs.height + Math.random() * 200, // Come from bottom to top
+        dy: -(3 + Math.random() * 2)
       });
     }
   }
@@ -194,34 +195,36 @@
   function update() {
     frame++;
     if (state === 'PLAYING') {
-      lanes.forEach(lane => {
-        lane.ents.forEach(e => {
-          e.x += lane.dir * lane.spd;
-          if (lane.dir === 1 && e.x > cvs.width) e.x = -TILE;
-          if (lane.dir === -1 && e.x < -TILE) e.x = cvs.width;
-          
-          // Collision Check
-          if (player.y === lane.y) {
-            let px = player.x * TILE;
-            let py = player.y * TILE;
-            if (px < e.x + TILE - 8 && px + TILE - 8 > e.x &&
-                py < py + TILE - 8 && py + TILE - 8 > py) {
-              state = 'GAMEOVER';
-              msgScreen.style.display = 'flex';
-            }
-          }
-        });
-      });
+      distance += baseSpeed;
+      bgScrollY += baseSpeed;
+      if (bgScrollY >= TILE) bgScrollY = 0;
 
-      if (player.y === 0) {
-        triggerTransition();
+      spawnObstacle();
+
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        let obs = obstacles[i];
+        obs.x += obs.dx;
+        obs.y += obs.dy;
+
+        // Bounding box collision
+        if (player.x < obs.x + obs.w && player.x + player.w > obs.x &&
+            player.y < obs.y + obs.h && player.y + player.h > obs.y) {
+          state = 'GAMEOVER';
+          msgScreen.style.display = 'flex';
+        }
+
+        if (obs.y > cvs.height) obstacles.splice(i, 1);
       }
+
+      if (distance > levelDistance) {
+        level++;
+        initLevel(false);
+      }
+
     } else if (state === 'TRANSITION') {
       shakeFrames--;
-      buffaloes.forEach(b => b.y += b.spd);
+      buffaloes.forEach(b => b.y += b.dy);
       if (shakeFrames <= 0) {
-        level++;
-        initLevel();
         state = 'PLAYING';
       }
     }
@@ -230,8 +233,8 @@
   function draw() {
     let shakeX = 0, shakeY = 0;
     if (state === 'TRANSITION') {
-      shakeX = (Math.random() - 0.5) * 8;
-      shakeY = (Math.random() - 0.5) * 8;
+      shakeX = (Math.random() - 0.5) * 6;
+      shakeY = (Math.random() - 0.5) * 6;
     }
 
     ctx.save();
@@ -240,33 +243,37 @@
     let bIdx = (level - 1) % BIOMES.length;
     let b = BIOMES[bIdx];
 
-    // Draw Background
-    for (let r = 0; r < ROWS; r++) {
-      ctx.fillStyle = (r === 0 || r === 9) ? b.safe : b.bg;
-      ctx.fillRect(0, r * TILE, cvs.width, TILE);
-    }
+    // Racing Ground Illusion
+    ctx.fillStyle = b.bg;
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
     
-    // Draw Lanes & Entities
-    lanes.forEach(lane => {
-      if (lane.isWater) {
-        ctx.fillStyle = b.water;
-        ctx.fillRect(0, lane.y * TILE, cvs.width, TILE);
+    ctx.fillStyle = b.detail;
+    for (let r = -1; r <= ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if ((r + c) % 2 === 0) {
+          ctx.fillRect(c * TILE, (r * TILE) + bgScrollY, 4, 4);
+        }
       }
-      lane.ents.forEach(e => {
-        let obs = sprObstacles[e.type];
-        drawSprite(e.x, lane.y * TILE, obs.m, obs.c);
-      });
+    }
+
+    // Obstacles
+    obstacles.forEach(obs => {
+      let pal, spr;
+      if (obs.type === 'rock') { spr = sprRock; pal = {1:'#212121', 2:'#757575', 3:'#BDBDBD'}; }
+      else if (obs.type === 'tree') { spr = sprTree; pal = {1:'#1B5E20', 2:'#2E7D32', 3:'#4CAF50', 4:'#5D4037'}; }
+      else if (obs.type === 'fox') { spr = sprFox; pal = {1:'#BF360C', 2:'#E65100', 3:'#FFF'}; }
+      drawSprite(obs.x, obs.y, spr, pal);
     });
 
-    // Draw Player
-    if (state !== 'GAMEOVER' || frame % 10 < 5) { // Blink if dead
-      drawSprite(player.x * TILE, player.y * TILE, sprPlayer, {1:'#3D5948', 2:'#D4D0C5', 3:'#1E3A8A', 4:'#5D4037'});
+    // Player
+    if (state !== 'GAMEOVER' || frame % 10 < 5) { 
+      drawSprite(player.x, player.y, sprPlayer, {1:'#000', 2:'#D4D0C5', 3:'#1E3A8A', 4:'#5D4037'});
     }
 
-    // Draw Rumble Buffalo
+    // Rumble Buffalo
     if (state === 'TRANSITION') {
       buffaloes.forEach(buf => {
-        drawSprite(buf.x, buf.y, sprBuffalo, {1:'#3E2723', 2:'#000'});
+        drawSprite(buf.x, buf.y, sprBuffalo, {1:'#000', 2:'#3E2723', 3:'#FF0000'});
       });
     }
 
@@ -281,21 +288,20 @@
 
   function move(dx, dy) {
     if (state !== 'PLAYING') return;
-    let nx = player.x + dx;
-    let ny = player.y + dy;
-    if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
-      player.x = nx;
-      player.y = ny;
-    }
+    let spd = 6;
+    let nx = player.x + (dx * spd);
+    let ny = player.y + (dy * spd);
+    if (nx >= 0 && nx <= cvs.width - player.w) player.x = nx;
+    if (ny >= 0 && ny <= cvs.height - player.h) player.y = ny;
   }
 
+  // Universal Gamepad Listener[cite: 1, 4]
   window.addEventListener('message', function(event) {
     const cmd = event.data;
     if (cmd === 'BUTTON_A') {
       if (state === 'START' || state === 'GAMEOVER') {
         if (state === 'GAMEOVER') level = 1;
-        initLevel();
-        state = 'PLAYING';
+        initLevel(true); // Force rumble on start
         introScreen.style.display = 'none';
         msgScreen.style.display = 'none';
       }
@@ -306,18 +312,15 @@
     if (cmd === 'DPAD_RIGHT') move(1, 0);
   });
 
-  // Fallback keyboard controls for testing
+  // Keyboard Fallback
   window.addEventListener('keydown', (e) => {
     if(e.key === 'ArrowUp') move(0, -1);
     if(e.key === 'ArrowDown') move(0, 1);
     if(e.key === 'ArrowLeft') move(-1, 0);
     if(e.key === 'ArrowRight') move(1, 0);
-    if(e.key === 'a' || e.key === 'Enter') {
-      window.postMessage('BUTTON_A', '*');
-    }
+    if(e.key === 'a' || e.key === 'Enter') window.postMessage('BUTTON_A', '*');
   });
 
-  initLevel();
   loop();
 
 </script>
