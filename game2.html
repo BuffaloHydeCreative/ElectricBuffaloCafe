@@ -63,13 +63,13 @@
 
         const PALETTE = {
             0: null, 
-            1: '#540E11', // Night Bordeaux
-            2: '#f1c27d', // Skin tone
-            3: '#AD1C21', // Brick Red
-            4: '#0F6F9E', // Cornflower Ocean
-            5: '#FB6604', // Blaze Orange
-            6: '#12AEA2', // Light Sea Green
-            7: '#ffffff', // White
+            1: '#540E11', 
+            2: '#f1c27d', 
+            3: '#AD1C21', 
+            4: '#0F6F9E', 
+            5: '#FB6604', 
+            6: '#12AEA2', 
+            7: '#ffffff', 
         };
 
         const SPRITES = {
@@ -177,6 +177,7 @@
         let gameState = 'START';
         let score = 0, combo = 0, maxCombo = 0;
         let audioCtx = null, nextStepTime = 0.0, currentStep = 0, timerID;
+        let activeOscillators = []; // Array to track scheduled audio to prevent overlaps
         let expectedBeats = [], floatingTexts = [];
         let jiggerState = 'IDLE', jiggerTimer = 0, lastLeg = 'L';
         let currentTrackName = "";
@@ -201,6 +202,13 @@
         document.addEventListener('touchstart', unlockAudio, { once: true });
         document.addEventListener('mousedown', unlockAudio, { once: true });
 
+        function stopAllAudio() {
+            activeOscillators.forEach(osc => {
+                try { osc.stop(); } catch(e) {}
+            });
+            activeOscillators = [];
+        }
+
         function playFiddleNote(midiNote, time, duration) {
             if (!midiNote || !audioCtx) return;
             const osc = audioCtx.createOscillator();
@@ -215,6 +223,12 @@
             gain.connect(audioCtx.destination);
             osc.start(time);
             osc.stop(time + duration);
+
+            activeOscillators.push(osc);
+            osc.onended = () => {
+                const index = activeOscillators.indexOf(osc);
+                if (index > -1) activeOscillators.splice(index, 1);
+            };
         }
 
         function playClonk() {
@@ -230,6 +244,12 @@
             gain.connect(audioCtx.destination);
             osc.start();
             osc.stop(audioCtx.currentTime + 0.15);
+
+            activeOscillators.push(osc);
+            osc.onended = () => {
+                const index = activeOscillators.indexOf(osc);
+                if (index > -1) activeOscillators.splice(index, 1);
+            };
         }
 
         function scheduler() {
@@ -298,7 +318,6 @@
                     handleInput();
                 }
             } else if (event.data === 'BUTTON_B') {
-                // Instantly select a new performance and reload
                 if (gameState === 'PLAYING' || gameState === 'GAME_OVER') {
                     startGame();
                 }
@@ -309,11 +328,15 @@
             initAudio();
             if(audioCtx.state === 'suspended') audioCtx.resume();
             
+            // Clear any previously scheduled audio and stop the scheduling loop before restarting
+            clearTimeout(timerID); 
+            stopAllAudio();
+            
             const selectedTrack = TRACKS[Math.floor(Math.random() * TRACKS.length)];
             melodyPattern = selectedTrack.pattern;
             currentTrackName = selectedTrack.name;
 
-            score = 0; combo = 0; expectedBeats = [];
+            score = 0; combo = 0; expectedBeats = []; floatingTexts = [];
             gameState = 'PLAYING'; jiggerState = 'IDLE';
             nextStepTime = audioCtx.currentTime + 1.0;
             currentStep = 0; 
