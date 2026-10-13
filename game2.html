@@ -131,8 +131,6 @@
             ]
         };
 
-        // --- TRACK GENERATOR ---
-        // At 130 BPM, an 8th note is ~0.23 seconds. 192 steps = ~44.3 seconds.
         const baseJig = [
             { n: 74, t: true }, { n: 69, t: false }, { n: 71, t: true }, { n: 67, t: false },
             { n: 69, t: true }, { n: 66, t: false }, { n: 62, t: true }, { n: 64, t: false },
@@ -155,7 +153,6 @@
             {n:67, t:true}, {n:64, t:false}, {n:64, t:true}, {n:64, t:false}
         ];
 
-        // 3/4 waltz mapped to active step intervals (rests utilize n:0 to skip audio generation)
         const baseTeardropWaltz = [
             {n:62, t:true}, {n:0, t:false}, {n:67, t:true}, {n:67, t:false}, 
             {n:71, t:true}, {n:71, t:false}, {n:74, t:true}, {n:0, t:false}, 
@@ -172,9 +169,9 @@
         }
 
         const TRACKS = [
-            buildTrack(baseJig, 6, "Red River Jig"),              // 192 steps = ~44.3 seconds
-            buildTrack(baseOrangeBlossom, 6, "Orange Blossom"),   // 192 steps = ~44.3 seconds
-            buildTrack(baseTeardropWaltz, 8, "Teardrop Waltz")    // 192 steps = ~44.3 seconds
+            buildTrack(baseJig, 6, "Red River Jig"),
+            buildTrack(baseOrangeBlossom, 6, "Orange Blossom"),
+            buildTrack(baseTeardropWaltz, 8, "Teardrop Waltz")
         ];
 
         let gameState = 'START';
@@ -185,10 +182,24 @@
         let currentTrackName = "";
         let melodyPattern = [];
 
+        // --- AUDIO INITIALIZATION (WITH SAFARI UNLOCK) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        
         function initAudio() {
             if (audioCtx) return;
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            audioCtx = new AudioContext();
         }
+
+        function unlockAudio() {
+            initAudio();
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Invisible event listeners to handle mobile Safari user-gesture requirements
+        document.addEventListener('touchstart', unlockAudio, { once: true });
+        document.addEventListener('mousedown', unlockAudio, { once: true });
 
         function playFiddleNote(midiNote, time, duration) {
             if (!midiNote || !audioCtx) return;
@@ -249,10 +260,10 @@
 
             if (closestBeat && minDiff <= TOLERANCE_PERFECT) {
                 closestBeat.hit = true;
-                handleSuccess('Perfect!', 100, '#12AEA2'); // Light Sea Green
+                handleSuccess('Perfect!', 100, '#12AEA2'); 
             } else if (closestBeat && minDiff <= TOLERANCE_GOOD) {
                 closestBeat.hit = true;
-                handleSuccess('Good!', 50, '#FB6604'); // Blaze Orange
+                handleSuccess('Good!', 50, '#FB6604'); 
             } else {
                 handleMiss('Miss!');
             }
@@ -271,7 +282,7 @@
             combo = 0; jiggerState = 'FALL';
             jiggerTimer = audioCtx.currentTime + 1.0;
             playClonk();
-            spawnText(text, '#AD1C21'); // Brick Red
+            spawnText(text, '#AD1C21'); 
         }
 
         function spawnText(text, color) {
@@ -286,6 +297,11 @@
                 } else if (gameState === 'PLAYING') {
                     handleInput();
                 }
+            } else if (event.data === 'BUTTON_B') {
+                // Instantly select a new performance and reload
+                if (gameState === 'PLAYING' || gameState === 'GAME_OVER') {
+                    startGame();
+                }
             }
         });
 
@@ -293,7 +309,6 @@
             initAudio();
             if(audioCtx.state === 'suspended') audioCtx.resume();
             
-            // Randomly select a ~45 second track
             const selectedTrack = TRACKS[Math.floor(Math.random() * TRACKS.length)];
             melodyPattern = selectedTrack.pattern;
             currentTrackName = selectedTrack.name;
@@ -313,7 +328,6 @@
 
         function updateState() {
             if (gameState !== 'PLAYING') return;
-
             const now = audioCtx.currentTime;
             
             for (let i = expectedBeats.length - 1; i >= 0; i--) {
@@ -325,7 +339,6 @@
                 if ((b.hit || b.missed) && now > b.time + 1.0) expectedBeats.splice(i, 1);
             }
 
-            // End of song condition
             if (currentStep >= melodyPattern.length && expectedBeats.length === 0 && now > nextStepTime + 1.0) {
                 gameState = 'GAME_OVER';
             }
@@ -351,16 +364,15 @@
         }
 
         function draw() {
-            ctx.fillStyle = '#540E11'; // Night Bordeaux
+            ctx.fillStyle = '#540E11';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            ctx.fillStyle = '#12AEA2'; // Light Sea Green ground
+            ctx.fillStyle = '#12AEA2'; 
             ctx.fillRect(0, canvas.height - 140, canvas.width, 60);
             
-            ctx.fillStyle = '#0F6F9E'; // Cornflower track background
+            ctx.fillStyle = '#0F6F9E'; 
             ctx.fillRect(0, canvas.height - 80, canvas.width, 80);
 
-            // Menu Overlay - Start Screen
             if (gameState === 'START') {
                 ctx.fillStyle = '#FB6604';
                 ctx.font = '36px "Press Start 2P"';
@@ -370,10 +382,13 @@
                 ctx.fillStyle = '#ffffff';
                 ctx.font = '14px "Press Start 2P"';
                 ctx.fillText("PRESS 'A' TO PLAY", canvas.width/2, canvas.height/2 + 20);
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.font = '10px "Press Start 2P"';
+                ctx.fillText("(Safari iOS: Tap the screen once to unlock audio)", canvas.width/2, canvas.height/2 + 60);
                 return;
             }
 
-            // Menu Overlay - Game Over
             if (gameState === 'GAME_OVER') {
                 ctx.fillStyle = '#FB6604';
                 ctx.font = '36px "Press Start 2P"';
@@ -388,12 +403,15 @@
                 ctx.fillStyle = '#12AEA2';
                 ctx.font = '14px "Press Start 2P"';
                 ctx.fillText("PRESS 'A' TO REPLAY", canvas.width/2, canvas.height/2 + 80);
+
+                ctx.fillStyle = '#FB6604';
+                ctx.font = '10px "Press Start 2P"';
+                ctx.fillText("PRESS 'B' FOR NEXT TRACK", canvas.width/2, canvas.height/2 + 110);
                 return;
             }
 
-            // Gameplay Drawing
             if (gameState === 'PLAYING') {
-                ctx.strokeStyle = '#FB6604'; // Blaze Orange Hit Zone
+                ctx.strokeStyle = '#FB6604'; 
                 ctx.lineWidth = 4;
                 ctx.strokeRect(HIT_ZONE_X - 15, canvas.height - 75, 30, 70);
 
@@ -404,9 +422,9 @@
                         if (!b.hit && !b.missed) {
                             let x = HIT_ZONE_X + (b.time - now) * NOTE_SPEED;
                             if (x > -50 && x < canvas.width + 50) {
-                                ctx.fillStyle = '#AD1C21'; // Brick Red note
+                                ctx.fillStyle = '#AD1C21'; 
                                 ctx.fillRect(x - 10, canvas.height - 70, 20, 60);
-                                ctx.fillStyle = '#FB6604'; // Blaze Orange detail
+                                ctx.fillStyle = '#FB6604'; 
                                 ctx.fillRect(x - 5, canvas.height - 65, 10, 50);
                             }
                         }
@@ -426,19 +444,21 @@
             ctx.textAlign = 'left';
             ctx.fillText(`SCORE:${score}`, 20, 30);
             ctx.textAlign = 'right';
-            ctx.fillStyle = combo > 5 ? '#FB6604' : '#ffffff'; // Blaze Orange combo
+            ctx.fillStyle = combo > 5 ? '#FB6604' : '#ffffff'; 
             ctx.fillText(`COMBO:${combo}`, canvas.width - 20, 30);
 
-            // Display Track Title
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
             ctx.font = '12px "Press Start 2P"';
             ctx.textAlign = 'center';
-            ctx.fillText(`PLAYING: ${currentTrackName}`, canvas.width/2, canvas.height - 105);
+            ctx.fillText(`PLAYING: ${currentTrackName}`, canvas.width/2, canvas.height - 110);
 
             ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
             ctx.font = '10px "Press Start 2P"';
             ctx.textAlign = 'center';
-            ctx.fillText("PRESS 'A' ON THE BEAT!", canvas.width/2, canvas.height - 85);
+            ctx.fillText("PRESS 'A' ON THE BEAT!", canvas.width/2, canvas.height - 90);
+
+            ctx.fillStyle = 'rgba(251, 102, 4, 0.5)';
+            ctx.fillText("PRESS 'B' TO SKIP TRACK", canvas.width/2, canvas.height - 70);
 
             for (let ft of floatingTexts) {
                 ctx.fillStyle = ft.color;
@@ -453,7 +473,6 @@
             }
         }
 
-        // Initialize the loop
         requestAnimationFrame(gameLoop);
     </script>
 </body>
