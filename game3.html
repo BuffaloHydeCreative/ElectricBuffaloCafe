@@ -89,6 +89,7 @@
                 if (cmd === 'DPAD_LEFT') moveActive(-1, 0);
                 if (cmd === 'DPAD_RIGHT') moveActive(1, 0);
                 if (cmd === 'DPAD_DOWN') moveActive(0, 1); 
+                // DPAD_UP is intentionally ignored
                 if (cmd === 'BUTTON_A') rotateActive(1); 
                 if (cmd === 'BUTTON_B') rotateActive(-1); 
             }
@@ -149,11 +150,6 @@
             return false;
         }
 
-        function dropInstantly() {
-            while(moveActive(0, 1)) {}
-            lockPiece();
-        }
-
         function rotateActive(direction) {
             let newDir = (active.dir + direction + 4) % 4;
             if (isValid(active.x, active.y, newDir)) {
@@ -171,7 +167,34 @@
             board[p2.y][p2.x] = active.c2;
             combo = 0;
             gameState = 'CASCADING';
-            resolveFlowers();
+            
+            // TRIGGERS GRAVITY FIRST BEFORE CHECKING MATCHES
+            applyGravity();
+        }
+
+        function applyGravity() {
+            let moved = false;
+            for (let c = 0; c < COLS; c++) {
+                for (let r = ROWS - 2; r >= 0; r--) {
+                    if (board[r][c] !== 0) {
+                        let dropTo = r;
+                        while (dropTo + 1 < ROWS && board[dropTo + 1][c] === 0) {
+                            dropTo++;
+                        }
+                        if (dropTo !== r) {
+                            board[dropTo][c] = board[r][c];
+                            board[r][c] = 0;
+                            moved = true;
+                        }
+                    }
+                }
+            }
+            
+            if (moved) {
+                setTimeout(resolveFlowers, 300);
+            } else {
+                resolveFlowers(); 
+            }
         }
 
         function resolveFlowers() {
@@ -220,31 +243,6 @@
                 let parts = str.split(',');
                 return { y: parseInt(parts[0]), x: parseInt(parts[1]) };
             });
-        }
-
-        function applyGravity() {
-            let moved = false;
-            for (let c = 0; c < COLS; c++) {
-                for (let r = ROWS - 2; r >= 0; r--) {
-                    if (board[r][c] !== 0) {
-                        let dropTo = r;
-                        while (dropTo + 1 < ROWS && board[dropTo + 1][c] === 0) {
-                            dropTo++;
-                        }
-                        if (dropTo !== r) {
-                            board[dropTo][c] = board[r][c];
-                            board[r][c] = 0;
-                            moved = true;
-                        }
-                    }
-                }
-            }
-            
-            if (moved) {
-                setTimeout(resolveFlowers, 300);
-            } else {
-                resolveFlowers(); 
-            }
         }
 
         // ---------------------------------------------------------
