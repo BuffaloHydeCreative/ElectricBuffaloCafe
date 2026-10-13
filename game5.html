@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Metis Buffalo Hunter</title>
+<style>
+  body {
+    margin: 0; padding: 0;
+    background: transparent;
+    display: flex; justify-content: center; align-items: center;
+    height: 100vh; width: 100vw;
+    font-family: 'Courier New', Courier, monospace;
+    user-select: none; touch-action: manipulation; overflow: hidden;
+  }
+  #game-container {
+    width: 100%; height: 100%; max-width: 500px;
+    display: flex; flex-direction: column; justify-content: center;
+    box-sizing: border-box; padding: 10px;
+  }
+  #header {
+    flex: 0 0 auto; display: flex; justify-content: space-between;
+    color: #F7C844; font-weight: bold; margin-bottom: 10px;
+    border-bottom: 2px solid #3D5948; padding-bottom: 5px;
+    font-size: 14px; text-transform: uppercase;
+    text-shadow: 1px 1px 0 #000;
+  }
+  #screen-container {
+    flex: 0 0 auto; width: 100%;
+    aspect-ratio: 1 / 1; 
+    border: 4px solid #D4D0C5; 
+    position: relative; background: #0E2A1E;
+    overflow: hidden; box-sizing: border-box;
+  }
+  canvas {
+    width: 100%; height: 100%;
+    display: block; image-rendering: pixelated;
+  }
+  .overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(14, 42, 30, 0.85); 
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    color: #fff; text-align: center; padding: 15px; box-sizing: border-box;
+    z-index: 10;
+  }
+  h2 { color: #F7C844; margin: 0 0 10px 0; font-size: 20px; text-transform: uppercase; }
+  p { font-size: 12px; line-height: 1.5; margin: 0 0 15px 0; color: #D4D0C5; }
+  .blink-text { font-weight: bold; color: #12AEA2; font-size: 14px; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div id="header">
+    <span id="title-display">METIS BUFFALO HUNTER</span>
+    <span id="score-display">LEVEL: 1</span>
+  </div>
+  
+  <div id="screen-container">
+    <canvas id="gameCanvas" width="320" height="320"></canvas>
+    
+    <div id="intro-screen" class="overlay">
+      <h2>BUFFALO HUNTER</h2>
+      <p>Ride West across the lands.<br>Dodge wildlife and obstacles.<br>Reach the top to advance!<br><br>Use D-PAD to move.</p>
+      <div class="blink-text">PRESS 'A' TO START</div>
+    </div>
+    
+    <div id="msg" class="overlay" style="display: none;">
+      <h2>CRASHED!</h2>
+      <div class="blink-text">PRESS 'A' TO RESTART</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const cvs = document.getElementById('gameCanvas');
+  const ctx = cvs.getContext('2d');
+  const introScreen = document.getElementById('intro-screen');
+  const msgScreen = document.getElementById('msg');
+  const scoreDisplay = document.getElementById('score-display');
+  
+  const TILE = 32;
+  const ROWS = 10;
+  const COLS = 10;
+  
+  // Biome Palettes
+  const BIOMES = [
+    { name: "EASTERN WOODLANDS", bg: '#2D4A22', water: '#0F6F9E', safe: '#1A3311' },
+    { name: "TALL GRASS PRAIRIE", bg: '#C29B38', water: '#12AEA2', safe: '#A88022' },
+    { name: "DRY PRAIRIE", bg: '#A37A57', water: '#A37A57', safe: '#825D3E' },
+    { name: "ROCKY FOOTHILLS", bg: '#6B7A7A', water: '#4A5959', safe: '#4F5C5C' }
+  ];
+
+  let state = 'START'; // START, PLAYING, TRANSITION, GAMEOVER
+  let level = 1;
+  let shakeFrames = 0;
+  let frame = 0;
+  
+  let player = { x: 4, y: 9, dead: false };
+  let lanes = [];
+  let buffaloes = [];
+
+  // Minimal 8x8 Sprites (scaled to 32x32)
+  const drawSprite = (x, y, matrix, colors) => {
+    const s = TILE / 8;
+    for(let r=0; r<8; r++) {
+      for(let c=0; c<8; c++) {
+        let v = matrix[r][c];
+        if(v > 0) {
+          ctx.fillStyle = colors[v];
+          ctx.fillRect(x + c*s, y + r*s, s, s);
+        }
+      }
+    }
+  };
+
+  const sprPlayer = [
+    [0,0,0,1,1,0,0,0],
+    [0,0,2,2,2,0,0,0],
+    [0,3,3,3,3,3,0,0],
+    [0,4,3,2,3,4,4,0],
+    [4,4,4,4,4,4,4,4],
+    [0,4,4,4,4,4,4,0],
+    [0,4,0,4,4,0,4,0],
+    [0,4,0,4,4,0,4,0]
+  ]; // 1: Hat, 2: Skin, 3: Coat/Shirt, 4: Horse
+
+  const sprBuffalo = [
+    [0,0,1,1,1,1,0,0],
+    [0,1,1,1,1,1,1,0],
+    [1,1,1,1,1,1,1,1],
+    [1,2,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,1],
+    [0,1,1,1,1,1,1,0],
+    [0,1,0,1,1,0,1,0],
+    [0,1,0,1,1,0,1,0]
+  ]; // 1: Fur, 2: Eye
+
+  const sprObstacles = {
+    'log': { m: [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[1,1,1,1,1,1,1,1],[1,2,2,2,2,2,1,1],[1,1,1,1,1,1,1,1],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], c: {1:'#3E2723', 2:'#5D4037'} },
+    'rock': { m: [[0,0,0,0,0,0,0,0],[0,0,0,1,1,0,0,0],[0,0,1,2,2,1,0,0],[0,1,2,2,2,2,1,0],[1,2,2,2,2,2,2,1],[1,2,2,2,2,2,2,1],[1,1,1,1,1,1,1,1],[0,0,0,0,0,0,0,0]], c: {1:'#424242', 2:'#757575'} },
+    'bear': { m: [[0,0,0,0,0,0,0,0],[0,1,0,0,0,0,1,0],[1,1,1,1,1,1,1,1],[1,2,1,1,1,1,2,1],[1,1,1,1,1,1,1,1],[0,1,1,1,1,1,1,0],[0,1,0,1,1,0,1,0],[0,1,0,0,0,0,1,0]], c: {1:'#212121', 2:'#fff'} },
+    'fox':  { m: [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,1,0,0,0,0,1,0],[0,1,1,1,1,1,1,0],[1,1,2,1,1,2,1,1],[1,1,1,1,1,1,1,1],[0,1,0,1,1,0,1,0],[0,1,0,0,0,0,1,0]], c: {1:'#E65100', 2:'#fff'} },
+    'fish': { m: [[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,1,0,0,0,0,0,0],[1,1,1,1,1,1,0,0],[1,1,2,1,1,1,1,1],[1,1,1,1,1,1,0,0],[0,1,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], c: {1:'#00BCD4', 2:'#fff'} },
+    'tree': { m: [[0,0,0,1,1,0,0,0],[0,0,1,1,1,1,0,0],[0,1,1,1,1,1,1,0],[0,1,1,1,1,1,1,0],[0,0,1,1,1,1,0,0],[0,0,0,2,2,0,0,0],[0,0,0,2,2,0,0,0],[0,0,0,2,2,0,0,0]], c: {1:'#2E7D32', 2:'#5D4037'} }
+  };
+
+  function initLevel() {
+    let bIdx = (level - 1) % BIOMES.length;
+    let speedMult = 1 + (level * 0.15);
+    lanes = [];
+    
+    // Create Frogger rows (1 to 8)
+    for (let i = 1; i < ROWS - 1; i++) {
+      let isWater = (bIdx < 2 && (i === 2 || i === 3 || i === 6));
+      let dir = (i % 2 === 0) ? 1 : -1;
+      let spd = (1 + Math.random() * 1.5) * speedMult;
+      
+      let type;
+      if (isWater) type = Math.random() > 0.5 ? 'log' : 'fish';
+      else {
+        if (bIdx === 0) type = Math.random() > 0.5 ? 'bear' : 'tree';
+        else if (bIdx === 1) type = Math.random() > 0.5 ? 'fox' : 'rock';
+        else if (bIdx === 2) type = Math.random() > 0.5 ? 'fox' : 'rock';
+        else type = Math.random() > 0.5 ? 'bear' : 'rock';
+      }
+
+      let ents = [];
+      let count = Math.floor(Math.random() * 2) + 2; // 2 to 3 objects per lane
+      for (let j = 0; j < count; j++) {
+        ents.push({ x: j * (COLS / count) * TILE, type: type });
+      }
+
+      lanes.push({ y: i, dir: dir, spd: spd, isWater: isWater, ents: ents });
+    }
+    
+    player = { x: 4, y: 9, dead: false };
+    scoreDisplay.innerText = `LEVEL: ${level} - ${BIOMES[bIdx].name}`;
+  }
+
+  function triggerTransition() {
+    state = 'TRANSITION';
+    shakeFrames = 120; // 2 seconds at 60fps
+    buffaloes = [];
+    for(let i=0; i<15; i++) {
+      buffaloes.push({
+        x: Math.random() * (cvs.width + 100) - 50,
+        y: -Math.random() * 200,
+        spd: 3 + Math.random() * 4
+      });
+    }
+  }
+
+  function update() {
+    frame++;
+    if (state === 'PLAYING') {
+      lanes.forEach(lane => {
+        lane.ents.forEach(e => {
+          e.x += lane.dir * lane.spd;
+          if (lane.dir === 1 && e.x > cvs.width) e.x = -TILE;
+          if (lane.dir === -1 && e.x < -TILE) e.x = cvs.width;
+          
+          // Collision Check
+          if (player.y === lane.y) {
+            let px = player.x * TILE;
+            let py = player.y * TILE;
+            if (px < e.x + TILE - 8 && px + TILE - 8 > e.x &&
+                py < py + TILE - 8 && py + TILE - 8 > py) {
+              state = 'GAMEOVER';
+              msgScreen.style.display = 'flex';
+            }
+          }
+        });
+      });
+
+      if (player.y === 0) {
+        triggerTransition();
+      }
+    } else if (state === 'TRANSITION') {
+      shakeFrames--;
+      buffaloes.forEach(b => b.y += b.spd);
+      if (shakeFrames <= 0) {
+        level++;
+        initLevel();
+        state = 'PLAYING';
+      }
+    }
+  }
+
+  function draw() {
+    let shakeX = 0, shakeY = 0;
+    if (state === 'TRANSITION') {
+      shakeX = (Math.random() - 0.5) * 8;
+      shakeY = (Math.random() - 0.5) * 8;
+    }
+
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
+    let bIdx = (level - 1) % BIOMES.length;
+    let b = BIOMES[bIdx];
+
+    // Draw Background
+    for (let r = 0; r < ROWS; r++) {
+      ctx.fillStyle = (r === 0 || r === 9) ? b.safe : b.bg;
+      ctx.fillRect(0, r * TILE, cvs.width, TILE);
+    }
+    
+    // Draw Lanes & Entities
+    lanes.forEach(lane => {
+      if (lane.isWater) {
+        ctx.fillStyle = b.water;
+        ctx.fillRect(0, lane.y * TILE, cvs.width, TILE);
+      }
+      lane.ents.forEach(e => {
+        let obs = sprObstacles[e.type];
+        drawSprite(e.x, lane.y * TILE, obs.m, obs.c);
+      });
+    });
+
+    // Draw Player
+    if (state !== 'GAMEOVER' || frame % 10 < 5) { // Blink if dead
+      drawSprite(player.x * TILE, player.y * TILE, sprPlayer, {1:'#3D5948', 2:'#D4D0C5', 3:'#1E3A8A', 4:'#5D4037'});
+    }
+
+    // Draw Rumble Buffalo
+    if (state === 'TRANSITION') {
+      buffaloes.forEach(buf => {
+        drawSprite(buf.x, buf.y, sprBuffalo, {1:'#3E2723', 2:'#000'});
+      });
+    }
+
+    ctx.restore();
+  }
+
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function move(dx, dy) {
+    if (state !== 'PLAYING') return;
+    let nx = player.x + dx;
+    let ny = player.y + dy;
+    if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+      player.x = nx;
+      player.y = ny;
+    }
+  }
+
+  window.addEventListener('message', function(event) {
+    const cmd = event.data;
+    if (cmd === 'BUTTON_A') {
+      if (state === 'START' || state === 'GAMEOVER') {
+        if (state === 'GAMEOVER') level = 1;
+        initLevel();
+        state = 'PLAYING';
+        introScreen.style.display = 'none';
+        msgScreen.style.display = 'none';
+      }
+    }
+    if (cmd === 'DPAD_UP') move(0, -1);
+    if (cmd === 'DPAD_DOWN') move(0, 1);
+    if (cmd === 'DPAD_LEFT') move(-1, 0);
+    if (cmd === 'DPAD_RIGHT') move(1, 0);
+  });
+
+  // Fallback keyboard controls for testing
+  window.addEventListener('keydown', (e) => {
+    if(e.key === 'ArrowUp') move(0, -1);
+    if(e.key === 'ArrowDown') move(0, 1);
+    if(e.key === 'ArrowLeft') move(-1, 0);
+    if(e.key === 'ArrowRight') move(1, 0);
+    if(e.key === 'a' || e.key === 'Enter') {
+      window.postMessage('BUTTON_A', '*');
+    }
+  });
+
+  initLevel();
+  loop();
+
+</script>
+</body>
+</html>
