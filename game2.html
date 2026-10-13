@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>La Grande Gigue</title>
+    <title>Learn to Jig</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body {
@@ -63,13 +63,13 @@
 
         const PALETTE = {
             0: null, 
-            1: '#540E11', // Night Bordeaux (Dark outline/hair)
-            2: '#f1c27d', // Skin tone (Kept for visual clarity)
-            3: '#AD1C21', // Brick Red (Shirt)
-            4: '#0F6F9E', // Cornflower Ocean (Pants)
-            5: '#FB6604', // Blaze Orange (Sash/highlights)
-            6: '#12AEA2', // Light Sea Green (Shoes/details)
-            7: '#ffffff', // White (Eyes)
+            1: '#540E11', // Night Bordeaux
+            2: '#f1c27d', // Skin tone
+            3: '#AD1C21', // Brick Red
+            4: '#0F6F9E', // Cornflower Ocean
+            5: '#FB6604', // Blaze Orange
+            6: '#12AEA2', // Light Sea Green
+            7: '#ffffff', // White
         };
 
         const SPRITES = {
@@ -131,13 +131,9 @@
             ]
         };
 
-        let gameState = 'START';
-        let score = 0, combo = 0, maxCombo = 0;
-        let audioCtx = null, nextStepTime = 0.0, currentStep = 0, timerID;
-        let expectedBeats = [], floatingTexts = [];
-        let jiggerState = 'IDLE', jiggerTimer = 0, lastLeg = 'L';
-
-        const melodyPattern = [
+        // --- TRACK GENERATOR ---
+        // At 130 BPM, an 8th note is ~0.23 seconds. 192 steps = ~44.3 seconds.
+        const baseJig = [
             { n: 74, t: true }, { n: 69, t: false }, { n: 71, t: true }, { n: 67, t: false },
             { n: 69, t: true }, { n: 66, t: false }, { n: 62, t: true }, { n: 64, t: false },
             { n: 66, t: true }, { n: 67, t: false }, { n: 69, t: true }, { n: 71, t: false },
@@ -147,6 +143,47 @@
             { n: 67, t: true }, { n: 64, t: false }, { n: 61, t: true }, { n: 64, t: false },
             { n: 62, t: true }, { n: 66, t: false }, { n: 69, t: true }, { n: 74, t: false }
         ];
+
+        const baseOrangeBlossom = [
+            {n:64, t:true}, {n:64, t:false}, {n:67, t:true}, {n:64, t:false}, 
+            {n:69, t:true}, {n:64, t:false}, {n:67, t:true}, {n:64, t:false}, 
+            {n:64, t:true}, {n:64, t:false}, {n:67, t:true}, {n:64, t:false}, 
+            {n:62, t:true}, {n:60, t:false}, {n:64, t:true}, {n:64, t:false}, 
+            {n:69, t:true}, {n:69, t:false}, {n:71, t:true}, {n:69, t:false}, 
+            {n:72, t:true}, {n:69, t:false}, {n:71, t:true}, {n:69, t:false}, 
+            {n:69, t:true}, {n:69, t:false}, {n:71, t:true}, {n:69, t:false}, 
+            {n:67, t:true}, {n:64, t:false}, {n:64, t:true}, {n:64, t:false}
+        ];
+
+        // 3/4 waltz mapped to active step intervals (rests utilize n:0 to skip audio generation)
+        const baseTeardropWaltz = [
+            {n:62, t:true}, {n:0, t:false}, {n:67, t:true}, {n:67, t:false}, 
+            {n:71, t:true}, {n:71, t:false}, {n:74, t:true}, {n:0, t:false}, 
+            {n:71, t:true}, {n:71, t:false}, {n:67, t:true}, {n:67, t:false}, 
+            {n:69, t:true}, {n:0, t:false}, {n:66, t:true}, {n:66, t:false}, 
+            {n:62, t:true}, {n:62, t:false}, {n:67, t:true}, {n:0, t:false}, 
+            {n:67, t:true}, {n:0, t:false}, {n:67, t:true}, {n:0, t:false}
+        ];
+
+        function buildTrack(basePattern, loopCount, title) {
+            let fullPattern = [];
+            for(let i=0; i<loopCount; i++) fullPattern = fullPattern.concat(basePattern);
+            return { name: title, pattern: fullPattern };
+        }
+
+        const TRACKS = [
+            buildTrack(baseJig, 6, "Red River Jig"),              // 192 steps = ~44.3 seconds
+            buildTrack(baseOrangeBlossom, 6, "Orange Blossom"),   // 192 steps = ~44.3 seconds
+            buildTrack(baseTeardropWaltz, 8, "Teardrop Waltz")    // 192 steps = ~44.3 seconds
+        ];
+
+        let gameState = 'START';
+        let score = 0, combo = 0, maxCombo = 0;
+        let audioCtx = null, nextStepTime = 0.0, currentStep = 0, timerID;
+        let expectedBeats = [], floatingTexts = [];
+        let jiggerState = 'IDLE', jiggerTimer = 0, lastLeg = 'L';
+        let currentTrackName = "";
+        let melodyPattern = [];
 
         function initAudio() {
             if (audioCtx) return;
@@ -189,7 +226,7 @@
             while (nextStepTime < audioCtx.currentTime + SCHEDULE_AHEAD_TIME) {
                 if (currentStep < melodyPattern.length) {
                     const stepData = melodyPattern[currentStep];
-                    if (stepData.n) playFiddleNote(stepData.n, nextStepTime, STEP_INTERVAL * 0.9);
+                    if (stepData.n !== 0) playFiddleNote(stepData.n, nextStepTime, STEP_INTERVAL * 0.9);
                     if (stepData.t) expectedBeats.push({ time: nextStepTime, hit: false, missed: false });
                 }
                 nextStepTime += STEP_INTERVAL;
@@ -255,6 +292,12 @@
         function startGame() {
             initAudio();
             if(audioCtx.state === 'suspended') audioCtx.resume();
+            
+            // Randomly select a ~45 second track
+            const selectedTrack = TRACKS[Math.floor(Math.random() * TRACKS.length)];
+            melodyPattern = selectedTrack.pattern;
+            currentTrackName = selectedTrack.name;
+
             score = 0; combo = 0; expectedBeats = [];
             gameState = 'PLAYING'; jiggerState = 'IDLE';
             nextStepTime = audioCtx.currentTime + 1.0;
@@ -273,7 +316,6 @@
 
             const now = audioCtx.currentTime;
             
-            // Check for missed beats
             for (let i = expectedBeats.length - 1; i >= 0; i--) {
                 let b = expectedBeats[i];
                 if (!b.hit && !b.missed && now > b.time + TOLERANCE_GOOD) {
@@ -323,7 +365,7 @@
                 ctx.fillStyle = '#FB6604';
                 ctx.font = '36px "Press Start 2P"';
                 ctx.textAlign = 'center';
-                ctx.fillText("La Grande Gigue", canvas.width/2, canvas.height/2 - 40);
+                ctx.fillText("Learn to Jig", canvas.width/2, canvas.height/2 - 40);
                 
                 ctx.fillStyle = '#ffffff';
                 ctx.font = '14px "Press Start 2P"';
@@ -387,10 +429,16 @@
             ctx.fillStyle = combo > 5 ? '#FB6604' : '#ffffff'; // Blaze Orange combo
             ctx.fillText(`COMBO:${combo}`, canvas.width - 20, 30);
 
+            // Display Track Title
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.font = '12px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.fillText(`PLAYING: ${currentTrackName}`, canvas.width/2, canvas.height - 105);
+
             ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
             ctx.font = '10px "Press Start 2P"';
             ctx.textAlign = 'center';
-            ctx.fillText("PRESS 'A' ON THE BEAT!", canvas.width/2, canvas.height - 90);
+            ctx.fillText("PRESS 'A' ON THE BEAT!", canvas.width/2, canvas.height - 85);
 
             for (let ft of floatingTexts) {
                 ctx.fillStyle = ft.color;
