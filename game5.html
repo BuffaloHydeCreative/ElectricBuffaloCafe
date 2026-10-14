@@ -137,13 +137,17 @@
     [0,1,0,1,1,0,1,0]
   ]; 
 
+  // Pelt scale increased to a 9x8 matrix (a 50% physical pixel bump) to enhance the look with Brick Red and Light Sea Green decorative beading referencing the "HTML Games" file[cite: 7]
   const sprPelt = [
-    [0,1,1,1,1,0],
-    [1,2,2,2,2,1],
-    [1,2,3,2,2,1],
-    [1,2,2,2,2,1],
-    [0,1,1,1,1,0]
-  ]; 
+    [0,0,1,1,1,1,1,0,0],
+    [0,1,2,2,2,2,2,1,0],
+    [1,2,3,2,4,2,3,2,1],
+    [1,2,2,4,5,4,2,2,1],
+    [1,2,2,4,5,4,2,2,1],
+    [1,2,3,2,4,2,3,2,1],
+    [0,1,2,2,2,2,2,1,0],
+    [0,0,1,1,1,1,1,0,0]
+  ];
 
   const sprRock = [[0,0,1,1,1,0,0],[0,1,2,2,2,1,0],[1,2,3,2,3,2,1],[1,2,2,2,2,2,1],[1,1,1,1,1,1,1]]; 
   const sprTree = [[0,0,0,1,1,0,0,0],[0,0,1,2,2,1,0,0],[0,1,2,3,2,2,1,0],[1,2,2,2,3,2,2,1],[1,2,3,2,2,2,2,1],[1,2,2,2,2,2,2,1],[0,0,1,4,4,1,0,0],[0,0,1,4,4,1,0,0]]; 
@@ -166,11 +170,11 @@
       let dx = (type === 'fox') ? (Math.random() > 0.5 ? 0.4 : -0.4) : 0;
       let dy = baseSpeed + (Math.random() * 0.4);
 
-      // Obstacle scaling 
+      // Obstacle scaling adjusted for the new 50% larger detailed pelt matrix
       let w = 28, h = 20, scale = 4; 
       if (type === 'tree') { w = 48; h = 48; scale = 6; } 
       if (type === 'fox') { w = 24; h = 20; scale = 4; }
-      if (type === 'pelt') { w = 12; h = 10; scale = 2; } 
+      if (type === 'pelt') { w = 18; h = 16; scale = 2; } 
 
       obstacles.push({ x: x, y: -50, dx: dx, dy: dy, type: type, w: w, h: h, scale: scale, dead: false });
     }
@@ -223,7 +227,7 @@
 
         // Bounding box collision (forgiving inset adapted for larger player sprite)
         let inset = (obs.type === 'pelt') ? 0 : 4;
-        let playerInset = 6; // forgiving bounding box for the new large 32x32 player
+        let playerInset = 6; 
 
         if (!obs.dead && 
             player.x + playerInset < obs.x + obs.w - inset && 
@@ -288,7 +292,7 @@
       if (obs.type === 'rock') { spr = sprRock; pal = {1:'#212121', 2:'#757575', 3:'#E0E0E0'}; }
       else if (obs.type === 'tree') { spr = sprTree; pal = {1:'#1B5E20', 2:'#2E7D32', 3:'#4CAF50', 4:'#3E2723'}; }
       else if (obs.type === 'fox') { spr = sprFox; pal = {1:'#540E11', 2:'#FB6604', 3:'#FFF'}; }
-      else if (obs.type === 'pelt') { spr = sprPelt; pal = {1:'#000', 2:'#F7C844', 3:'#FFF'}; }
+      else if (obs.type === 'pelt') { spr = sprPelt; pal = {1:'#000', 2:'#F7C844', 3:'#FFF', 4:'#AD1C21', 5:'#12AEA2'}; }
       drawSprite(obs.x, obs.y, spr, pal, obs.scale);
     });
 
