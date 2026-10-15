@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Bonami!</title>
+<title>Riverlot Adventure</title>
 <style>
   body {
     margin: 0; padding: 0;
@@ -70,7 +70,7 @@
     <canvas id="gameCanvas" width="240" height="240"></canvas>
     
     <div id="intro-screen" class="overlay">
-      <h2>Bonami!</h2>
+      <h2>Riverlot</h2>
       <p>Explore your lot & neighbor's land.<br>Harvest garden & hay crops (-1 Energy).<br>Watch out for wild wolves!<br>Rest at the Homestead cabin to recharge.</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
@@ -123,9 +123,13 @@
   let shiftTargetY = 0;
   let frame = 0;
   
+  // Player state setup for Tile-Based Snapping Movement
   let player = { 
-    x: 108, y: camera.y + 108, w: 16, h: 18, 
-    speed: 3, dx: 0, dy: 0, dir: 'down',
+    x: 96, y: camera.y + 96, // Snap to grid multiple of 24
+    targetX: 96, targetY: camera.y + 96,
+    w: 16, h: 18, 
+    speed: 3, dir: 'down',
+    moving: false,
     slashing: false, slashTimer: 0,
     animFrame: 0 
   };
@@ -198,13 +202,11 @@
     mapObjects = [];
     enemies = [];
 
-    // Water Shoreline Barrier across full world width (Zone 3)
     mapObjects.push({ x: 0, y: (SCREEN_SIZE * 3) + 30, w: WORLD_WIDTH, h: 210, type: 'water_barrier', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: -1 });
 
     for (let lot = 0; lot < WORLD_COLS; lot++) {
       let ox = lot * SCREEN_SIZE;
 
-      // 1. Zone 0: Deep Woodlands (Reduced count: 12 trees)
       let trees = 0, attempts = 0;
       while (trees < 12 && attempts < 100) {
         let x = ox + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
@@ -216,7 +218,6 @@
         attempts++;
       }
 
-      // 2. Zone 1: Hay Privilege (Reduced count: 10 bushes)
       let bushes = 0; attempts = 0;
       while (bushes < 10 && attempts < 100) {
         let x = ox + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
@@ -228,34 +229,31 @@
         attempts++;
       }
 
-      // 3. Zone 2: Homestead & Dedicated Garden Patch
       let cabinX = ox + 24 + Math.floor(Math.random() * 3) * 48;
       let cabinY = (SCREEN_SIZE * 2) + 36 + Math.floor(Math.random() * 2) * 48;
       
-      if (lot === 0 && Math.hypot(cabinX - 108, cabinY - (camera.y + 108)) < 48) {
-        cabinX = ox + 16;
+      if (lot === 0 && Math.hypot(cabinX - 96, cabinY - (camera.y + 96)) < 48) {
+        cabinX = ox + 24;
       }
 
       mapObjects.push({ x: cabinX, y: cabinY, w: 60, h: 40, type: 'cabin', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
 
-      // Add structured Homestead Garden beside the cabin
-      let gardenX = cabinX + 64;
+      let gardenX = cabinX + 72;
       let gardenY = cabinY;
-      if (gardenX + 48 > ox + SCREEN_SIZE) gardenX = cabinX - 52;
+      if (gardenX + 48 > ox + SCREEN_SIZE) gardenX = cabinX - 48;
 
       mapObjects.push({ x: gardenX, y: gardenY, w: 48, h: 40, type: 'garden_soil', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot });
       
-      if (!isSpaceOccupied(gardenX + 4, gardenY + 8, TILE, TILE)) {
-        mapObjects.push({ x: gardenX + 4, y: gardenY + 8, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
+      if (!isSpaceOccupied(gardenX, gardenY, TILE, TILE)) {
+        mapObjects.push({ x: gardenX, y: gardenY, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
       }
-      if (!isSpaceOccupied(gardenX + 24, gardenY + 8, TILE, TILE)) {
-        mapObjects.push({ x: gardenX + 24, y: gardenY + 8, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
+      if (!isSpaceOccupied(gardenX + 24, gardenY, TILE, TILE)) {
+        mapObjects.push({ x: gardenX + 24, y: gardenY, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
       }
 
-      // 4. Random Wolf Spawn per Riverlot (Zones 0, 1, or 2)
       let wolfZoneY = Math.floor(Math.random() * 3) * SCREEN_SIZE;
-      let wolfX = ox + 36 + Math.random() * 140;
-      let wolfY = wolfZoneY + 36 + Math.random() * 140;
+      let wolfX = ox + 48 + Math.random() * 120;
+      let wolfY = wolfZoneY + 48 + Math.random() * 120;
       enemies.push({ x: wolfX, y: wolfY, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot, bounceX: 0, bounceY: 0, hp: 1 });
     }
   }
@@ -267,41 +265,35 @@
             a.y < by + b.h && a.y + a.h > by);
   }
 
-  function tryMove(dx, dy) {
-    if (isShifting || player.slashing) return; 
-    
-    player.x += dx;
-    player.y += dy;
+  function moveTile(dirStr) {
+    if (isShifting || player.slashing || player.moving) return;
 
-    if (player.x < 0) player.x = 0;
-    if (player.x + player.w > WORLD_WIDTH) player.x = WORLD_WIDTH - player.w;
-    if (player.y < 0) player.y = 0;
-    if (player.y + player.h > WORLD_HEIGHT) player.y = WORLD_HEIGHT - player.h;
+    let nextX = player.targetX;
+    let nextY = player.targetY;
 
-    for(let obj of mapObjects) {
-      if(obj.solid && isColliding(player, obj)) {
-        player.x -= dx;
-        player.y -= dy;
-        return;
-      }
+    if (dirStr === 'DPAD_UP' || dirStr === 'up') { nextY -= TILE; player.dir = 'up'; }
+    else if (dirStr === 'DPAD_DOWN' || dirStr === 'down') { nextY += TILE; player.dir = 'down'; }
+    else if (dirStr === 'DPAD_LEFT' || dirStr === 'left') { nextX -= TILE; player.dir = 'left'; }
+    else if (dirStr === 'DPAD_RIGHT' || dirStr === 'right') { nextX += TILE; player.dir = 'right'; }
+
+    // World Bounds
+    if (nextX < 0 || nextX + player.w > WORLD_WIDTH || nextY < 0 || nextY + player.h > WORLD_HEIGHT) return;
+
+    // Obstacle Collision Check
+    let testBox = { x: nextX, y: nextY, w: player.w, h: player.h };
+    for (let obj of mapObjects) {
+      if (obj.solid && isColliding(testBox, obj)) return;
     }
 
-    let currentCol = Math.floor(camera.x / SCREEN_SIZE);
-    let currentRow = Math.floor(camera.y / SCREEN_SIZE);
-    let playerCol = Math.floor(player.x / SCREEN_SIZE);
-    let playerRow = Math.floor(player.y / SCREEN_SIZE);
-    
-    if (playerCol !== currentCol || playerRow !== currentRow) {
-      isShifting = true;
-      shiftTargetX = playerCol * SCREEN_SIZE;
-      shiftTargetY = playerRow * SCREEN_SIZE;
-      
-      mapObjects.forEach(obj => {
-         if (obj.type === 'cut_bush') {
-             obj.type = 'bush'; 
-             obj.solid = true; 
-         }
-      });
+    player.targetX = nextX;
+    player.targetY = nextY;
+    player.moving = true;
+  }
+
+  function stopTileMovement() {
+    // Halts player immediately upon input release if they've reached their target tile
+    if (player.x === player.targetX && player.y === player.targetY) {
+      player.moving = false;
     }
   }
 
@@ -309,7 +301,27 @@
     if (state !== 'PLAYING') return;
     frame++;
 
-    // Camera Shift
+    // Tile Interpolation Logic
+    if (player.moving) {
+      let stepX = Math.sign(player.targetX - player.x) * player.speed;
+      let stepY = Math.sign(player.targetY - player.y) * player.speed;
+
+      player.x += stepX;
+      player.y += stepY;
+
+      if (Math.abs(player.x - player.targetX) < player.speed) player.x = player.targetX;
+      if (Math.abs(player.y - player.targetY) < player.speed) player.y = player.targetY;
+
+      if (player.x === player.targetX && player.y === player.targetY) {
+        player.moving = false;
+      }
+
+      if (frame % 8 === 0) player.animFrame = 1 - player.animFrame;
+    } else {
+      player.animFrame = 0;
+    }
+
+    // Camera Shift in 2D Grid
     if (isShifting) {
       if (camera.x < shiftTargetX) camera.x = Math.min(shiftTargetX, camera.x + 8);
       else if (camera.x > shiftTargetX) camera.x = Math.max(shiftTargetX, camera.x - 8);
@@ -319,11 +331,22 @@
 
       if (camera.x === shiftTargetX && camera.y === shiftTargetY) isShifting = false;
     } else {
-      if (player.dx !== 0 || player.dy !== 0) {
-        tryMove(player.dx, player.dy);
-        if (frame % 8 === 0) player.animFrame = 1 - player.animFrame;
-      } else {
-        player.animFrame = 0; 
+      let currentCol = Math.floor(camera.x / SCREEN_SIZE);
+      let currentRow = Math.floor(camera.y / SCREEN_SIZE);
+      let playerCol = Math.floor(player.x / SCREEN_SIZE);
+      let playerRow = Math.floor(player.y / SCREEN_SIZE);
+      
+      if (playerCol !== currentCol || playerRow !== currentRow) {
+        isShifting = true;
+        shiftTargetX = playerCol * SCREEN_SIZE;
+        shiftTargetY = playerRow * SCREEN_SIZE;
+        
+        mapObjects.forEach(obj => {
+           if (obj.type === 'cut_bush') {
+               obj.type = 'bush'; 
+               obj.solid = true; 
+           }
+        });
       }
     }
 
@@ -332,7 +355,7 @@
       if (player.slashTimer <= 0) player.slashing = false;
     }
 
-    // Energy Replenishment (Player's Homestead)
+    // Energy Replenishment
     let playerCol = Math.floor(player.x / SCREEN_SIZE);
     let playerRow = Math.floor(player.y / SCREEN_SIZE);
     if (playerCol === 0 && playerRow === 2 && frame % 60 === 0 && energy < MAX_ENERGY) {
@@ -354,7 +377,6 @@
     for(let i=enemies.length-1; i>=0; i--) {
       let e = enemies[i];
 
-      // Handle active hit bounce decay
       if (Math.abs(e.bounceX) > 0.1 || Math.abs(e.bounceY) > 0.1) {
         e.x += e.bounceX;
         e.y += e.bounceY;
@@ -375,7 +397,6 @@
         e.y += e.dy;
       }
 
-      // Check collision with obstacles / water (Enemy bounce off solid objects)
       for (let obj of mapObjects) {
         if (obj.solid && isColliding(e, obj)) {
           e.x -= e.dx * 2;
@@ -386,23 +407,22 @@
         }
       }
 
-      // Enemy Bounds Check (Stay out of river water)
       let minX = e.lot * SCREEN_SIZE;
       let maxX = minX + SCREEN_SIZE - e.w;
       if (e.x < minX || e.x > maxX) { e.dx *= -1; e.x += e.dx; }
       if (e.y < 0 || e.y > SCREEN_SIZE * 3 + 10) { e.dy *= -1; e.y += e.dy; }
 
-      // Enemy Hit Player (Deplete energy & bounce both apart)
       if (isColliding(player, e) && !isShifting) {
         energy = Math.max(0, energy - 10);
         updateUI();
 
-        // Bounce trajectory
         let angle = Math.atan2(e.y - player.y, e.x - player.x);
         e.bounceX = Math.cos(angle) * 8;
         e.bounceY = Math.sin(angle) * 8;
         player.x -= Math.cos(angle) * 6;
         player.y -= Math.sin(angle) * 6;
+        player.targetX = player.x;
+        player.targetY = player.y;
       }
     }
   }
@@ -422,7 +442,6 @@
     if (player.dir === 'left') hitbox.x -= 16;
     if (player.dir === 'right') hitbox.x += 16;
 
-    // Slash Bushes
     for (let obj of mapObjects) {
       if (obj.type === 'bush' && isColliding(hitbox, obj)) {
         obj.type = 'cut_bush';
@@ -431,7 +450,6 @@
       }
     }
 
-    // Slash Enemies (Apply weapon hit bounce / knockback)
     for (let i = enemies.length - 1; i >= 0; i--) {
       let e = enemies[i];
       if (isColliding(hitbox, e)) {
@@ -452,7 +470,6 @@
     ctx.save();
     ctx.translate(-camera.x, -camera.y);
 
-    // Draw Zone Environments
     for (let c = 0; c < WORLD_COLS; c++) {
       let xOff = c * SCREEN_SIZE;
       for (let r = 0; r < WORLD_ROWS; r++) {
@@ -471,11 +488,9 @@
           ctx.fillStyle = C.DIRT;
           ctx.fillRect(xOff, yOff, SCREEN_SIZE, SCREEN_SIZE);
         } else if (r === 3) {
-          // Shoreline Bank
           ctx.fillStyle = C.DIRT;
           ctx.fillRect(xOff, yOff, SCREEN_SIZE, 20); 
 
-          // Dithered Pixel Gradient Shoreline (Dirt to Sand to Water)
           for (let px = 0; px < SCREEN_SIZE; px += 4) {
             ctx.fillStyle = (px % 8 === 0) ? C.SHORE_SAND : C.DIRT_DARK;
             ctx.fillRect(xOff + px, yOff + 20, 4, 4);
@@ -485,7 +500,6 @@
             ctx.fillRect(xOff + px, yOff + 28, 4, 4);
           }
 
-          // Red River Water
           ctx.fillStyle = C.WATER;
           ctx.fillRect(xOff, yOff + 32, SCREEN_SIZE, 208); 
           ctx.fillStyle = C.WATER_LIGHT;
@@ -495,7 +509,6 @@
       }
     }
 
-    // Draw Map Objects
     for (let obj of mapObjects) {
       if (obj.type === 'tree') {
         drawSprite(obj.x, obj.y, sprTree, {1:C.LEAVES, 2:C.GRASS_LIGHT, 3:C.WOOD});
@@ -518,15 +531,12 @@
       }
     }
 
-    // Draw Drops
     for (let d of drops) drawSprite(d.x, d.y, sprLoot, {1:C.WOOD, 2:C.GOLD});
 
-    // Draw Enemies
     for (let e of enemies) {
       drawSprite(e.x, e.y, sprWolf, {1:'#000', 2:C.WOLF_FUR, 3:C.WOLF_EYE});
     }
 
-    // Draw Sword Slash Effect
     if (player.slashing) {
       ctx.fillStyle = '#fff';
       if (player.dir === 'up') ctx.fillRect(player.x+6, player.y-10, 6, 12);
@@ -535,7 +545,6 @@
       else if (player.dir === 'right') ctx.fillRect(player.x+16, player.y+8, 12, 6);
     }
     
-    // Draw Character (Blue Capot, Red Sash)
     let currentAnim = sprPlayerDown[player.animFrame];
     drawSprite(player.x - 3, player.y - 4, currentAnim, {1:C.WOOD, 2:C.SKIN, 3:C.CAPOT_BLUE, 4:C.SASH_RED});
 
@@ -568,17 +577,18 @@
       if (state === 'START') startGame();
       else doAction();
     }
-    if (cmd === 'DPAD_UP') { player.dy = -player.speed; player.dir = 'up'; }
-    else if (cmd === 'DPAD_DOWN') { player.dy = player.speed; player.dir = 'down'; }
-    else if (cmd === 'DPAD_LEFT') { player.dx = -player.speed; player.dir = 'left'; }
-    else if (cmd === 'DPAD_RIGHT') { player.dx = player.speed; player.dir = 'right'; }
+    if (cmd === 'DPAD_UP' || cmd === 'DPAD_DOWN' || cmd === 'DPAD_LEFT' || cmd === 'DPAD_RIGHT') {
+      moveTile(cmd);
+    } else if (cmd === 'RELEASE' || cmd === 'STOP') {
+      stopTileMovement();
+    }
   });
 
   window.addEventListener('keydown', (e) => {
-    if(e.key === 'ArrowUp') { player.dy = -player.speed; player.dir = 'up'; }
-    if(e.key === 'ArrowDown') { player.dy = player.speed; player.dir = 'down'; }
-    if(e.key === 'ArrowLeft') { player.dx = -player.speed; player.dir = 'left'; }
-    if(e.key === 'ArrowRight') { player.dx = player.speed; player.dir = 'right'; }
+    if(e.key === 'ArrowUp') moveTile('up');
+    if(e.key === 'ArrowDown') moveTile('down');
+    if(e.key === 'ArrowLeft') moveTile('left');
+    if(e.key === 'ArrowRight') moveTile('right');
     if(e.key === 'a' || e.key === 'Enter') {
       if (state === 'START') startGame();
       else doAction();
@@ -586,12 +596,12 @@
   });
 
   window.addEventListener('keyup', (e) => {
-    if(e.key === 'ArrowUp' || e.key === 'ArrowDown') player.dy = 0;
-    if(e.key === 'ArrowLeft' || e.key === 'ArrowRight') player.dx = 0;
+    if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      stopTileMovement();
+    }
   });
 
-  draw();
-  requestAnimationFrame(loop);
+  loop();
 </script>
 </body>
 </html>
