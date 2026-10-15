@@ -343,7 +343,7 @@
             <li>li rassad di fleur.html</li>
             <li>li rassad.html</li>
             <li>Land Thunder!.html</li>
-            <li>Bonami!.html</li>
+            <li>game6.html</li>
             <li>game7.html</li>
           </ul>
         </div>
@@ -477,7 +477,7 @@
       }
     }
 
-    /* --- ADVANCED JOYSTICK DRAG LOGIC --- */
+    /* --- ADVANCED JOYSTICK DRAG & HOLD LOGIC --- */
     const joyBase = document.getElementById('joystick-base');
     const joyStick = document.getElementById('joystick-stick');
     
@@ -485,6 +485,32 @@
     let currentDir = null;
     const maxRadius = 35; // Maximum visual travel of the stick
     const deadzone = 15;  // Minimum pixels required to trigger a direction
+
+    // Continuous Hold Tracking Variables
+    let holdTimer = null;
+    let repeatInterval = null;
+
+    function startSendingDirection(dir) {
+      stopSendingDirection(); // Clear any existing timers
+      
+      // Fire the initial directional input immediately
+      pressDpad(dir); 
+      
+      // Wait 300ms to confirm the user is intentionally "holding" it
+      holdTimer = setTimeout(() => {
+        // Once held, continuously pulse the direction to the game every 100ms
+        repeatInterval = setInterval(() => {
+          pressDpad(dir);
+        }, 100); 
+      }, 300);
+    }
+
+    function stopSendingDirection() {
+      if (holdTimer) clearTimeout(holdTimer);
+      if (repeatInterval) clearInterval(repeatInterval);
+      holdTimer = null;
+      repeatInterval = null;
+    }
 
     function startDrag(e) {
       e.preventDefault();
@@ -535,11 +561,13 @@
         }
       }
 
-      // Only trigger input if direction state changes
+      // Trigger input only if direction state changes
       if (newDir !== currentDir) {
         currentDir = newDir;
         if (currentDir) {
-          pressDpad(currentDir);
+          startSendingDirection(currentDir); // Start the initial press and hold loop
+        } else {
+          stopSendingDirection(); // Stick returned to center deadzone
         }
       }
     }
@@ -549,6 +577,7 @@
       if (!isDragging) return;
       isDragging = false;
       currentDir = null;
+      stopSendingDirection(); // Stop all hold events upon release
       joyStick.classList.remove('dragging');
       joyStick.style.transform = `translate(0px, 0px)`; // Snap back to center
     }
