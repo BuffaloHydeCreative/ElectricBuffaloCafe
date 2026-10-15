@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Bonami!</title>
+<style>
+  body {
+    margin: 0; padding: 0;
+    background: transparent;
+    display: flex; justify-content: center; align-items: center;
+    height: 100vh; width: 100vw;
+    font-family: 'Courier New', Courier, monospace;
+    user-select: none; touch-action: manipulation; overflow: hidden;
+  }
+  #game-container {
+    width: 100%; height: 100%; max-width: 500px;
+    display: flex; flex-direction: column; justify-content: center;
+    box-sizing: border-box; padding: 10px;
+  }
+  #header {
+    flex: 0 0 auto; display: flex; flex-direction: column; gap: 5px;
+    color: #F7C844; font-weight: bold; margin-bottom: 10px;
+    border-bottom: 2px solid #3D5948; padding-bottom: 5px;
+    font-size: 14px; text-transform: uppercase;
+    text-shadow: 1px 1px 0 #000;
+  }
+  .header-row { display: flex; justify-content: space-between; align-items: center; }
+  .energy-bar { width: 100px; height: 12px; background: #222; border: 2px solid #D4D0C5; position: relative; }
+  .energy-fill { height: 100%; background: #12AEA2; width: 100%; transition: width 0.1s; }
+  
+  #screen-container {
+    flex: 0 0 auto; width: 100%;
+    aspect-ratio: 1 / 1; 
+    border: 4px solid #D4D0C5; 
+    position: relative; background: #387C44; 
+    overflow: hidden; box-sizing: border-box;
+  }
+  canvas {
+    width: 100%; height: 100%;
+    display: block; image-rendering: pixelated;
+  }
+  .overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85); 
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    color: #fff; text-align: center; padding: 15px; box-sizing: border-box;
+    z-index: 10;
+  }
+  h2 { color: #F7C844; margin: 0 0 10px 0; font-size: 20px; text-transform: uppercase; }
+  p { font-size: 12px; line-height: 1.5; margin: 0 0 15px 0; color: #D4D0C5; }
+  .blink-text { font-weight: bold; color: #12AEA2; font-size: 14px; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div id="header">
+    <div class="header-row">
+      <span id="title-display">RIVERLOT</span>
+      <span id="score-display">GOODS: 0</span>
+    </div>
+    <div class="header-row">
+      <span>ENERGY</span>
+      <div class="energy-bar"><div id="energy-fill" class="energy-fill"></div></div>
+    </div>
+  </div>
+  
+  <div id="screen-container">
+    <canvas id="gameCanvas" width="240" height="240"></canvas>
+    
+    <div id="intro-screen" class="overlay">
+      <h2>Bonami!</h2>
+      <p>Explore your lot & neighbor's land.<br>Harvest garden & hay crops (-1 Energy).<br>Watch out for wild wolves!<br>Rest at the Homestead cabin to recharge.</p>
+      <div class="blink-text">PRESS 'A' TO START</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const cvs = document.getElementById('gameCanvas');
+  const ctx = cvs.getContext('2d');
+  const introScreen = document.getElementById('intro-screen');
+  const scoreDisplay = document.getElementById('score-display');
+  const energyFill = document.getElementById('energy-fill');
+  
+  const TILE = 24; 
+  const SCREEN_SIZE = 240; 
+  const WORLD_COLS = 2; // Lot 0 (Player), Lot 1 (Neighbor)
+  const WORLD_ROWS = 4; // Woods, Hay Privilege, Homestead & Garden, Scenic River
+  const WORLD_WIDTH = SCREEN_SIZE * WORLD_COLS;
+  const WORLD_HEIGHT = SCREEN_SIZE * WORLD_ROWS; 
+  const FPS = 60; 
+  
+  const C = {
+    GRASS: '#387C44',
+    GRASS_LIGHT: '#4E9E5E',
+    DIRT: '#E4A672',
+    DIRT_DARK: '#A86D3F',
+    WOOD: '#7A4B29',
+    WOOD_LIGHT: '#A26D3F',
+    LEAVES: '#1E5928',
+    WATER: '#1A4D94',
+    WATER_LIGHT: '#3475D1',
+    SHORE_SAND: '#C29B38',
+    SKIN: '#F7D0A0',
+    CAPOT_BLUE: '#0F6F9E', 
+    SASH_RED: '#AD1C21',   
+    GOLD: '#F7C844',
+    STUMP: '#A26D3F',
+    WOLF_FUR: '#6C757D',
+    WOLF_EYE: '#AD1C21'
+  };
+
+  let state = 'START'; 
+  let inventory = 0;
+  let energy = 100;
+  const MAX_ENERGY = 100;
+  
+  let camera = { x: 0, y: SCREEN_SIZE * 2 }; 
+  let isShifting = false;
+  let shiftTargetX = 0;
+  let shiftTargetY = 0;
+  let frame = 0;
+  
+  let player = { 
+    x: 108, y: camera.y + 108, w: 16, h: 18, 
+    speed: 3, dx: 0, dy: 0, dir: 'down',
+    slashing: false, slashTimer: 0,
+    animFrame: 0 
+  };
+
+  let mapObjects = [];
+  let drops = [];
+  let enemies = [];
+
+  const drawSprite = (x, y, matrix, paletteMap) => {
+    const s = TILE / 8; 
+    for(let r=0; r<8; r++) {
+      for(let c=0; c<8; c++) {
+        let v = matrix[r][c];
+        if(v > 0) {
+          ctx.fillStyle = paletteMap[v];
+          ctx.fillRect(x + c*s, y + r*s, s, s);
+        }
+      }
+    }
+  };
+
+  const sprPlayerDown = [
+    [
+      [0,0,1,1,1,1,0,0],
+      [0,1,2,2,2,2,1,0],
+      [0,1,1,1,1,1,1,0],
+      [0,3,3,3,3,3,3,0],
+      [3,3,4,4,4,4,3,3],
+      [3,3,3,3,3,3,3,3],
+      [0,1,1,0,0,1,1,0],
+      [0,1,1,0,0,1,1,0]
+    ],
+    [
+      [0,0,1,1,1,1,0,0],
+      [0,1,2,2,2,2,1,0],
+      [0,1,1,1,1,1,1,0],
+      [0,3,3,3,3,3,3,0],
+      [3,3,4,4,4,4,3,3],
+      [3,3,3,3,3,3,3,3],
+      [0,1,1,0,0,0,0,0],
+      [0,0,0,0,0,1,1,0]
+    ]
+  ]; 
+  
+  const sprBush = [[0,0,1,1,1,0,0,0],[0,1,2,1,2,1,0,0],[1,2,1,2,1,2,1,0],[1,1,2,1,2,1,1,0],[1,2,1,2,1,2,1,0],[1,1,1,1,1,1,1,0],[0,1,1,1,1,1,0,0],[0,0,0,0,0,0,0,0]]; 
+  const sprTree = [[0,0,1,1,1,1,0,0],[0,1,2,1,1,2,1,0],[1,1,1,2,2,1,1,1],[1,2,1,1,1,1,2,1],[1,1,1,2,2,1,1,1],[0,1,1,1,1,1,1,0],[0,0,0,3,3,0,0,0],[0,0,0,3,3,0,0,0]]; 
+  const sprLoot = [[0,0,0,0,0,0,0,0],[0,0,1,1,1,0,0,0],[0,1,2,2,2,1,0,0],[0,1,2,2,2,1,0,0],[0,1,2,2,2,1,0,0],[0,0,1,1,1,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]; 
+
+  const sprWolf = [
+    [0,0,1,1,0,1,1,0],
+    [0,1,2,2,1,2,2,1],
+    [0,1,3,2,2,3,2,1],
+    [1,2,2,2,2,2,2,1],
+    [1,2,2,2,2,2,2,1],
+    [0,1,2,2,2,2,1,0],
+    [0,1,2,0,0,2,1,0],
+    [0,1,1,0,0,1,1,0]
+  ];
+
+  function isSpaceOccupied(x, y, w, h, ignoreObj = null) {
+    let testBox = { x, y, w, h };
+    for (let obj of mapObjects) {
+      if (obj === ignoreObj) continue;
+      if (isColliding(testBox, obj)) return true;
+    }
+    return false;
+  }
+
+  function generateMap() {
+    mapObjects = [];
+    enemies = [];
+
+    // Water Shoreline Barrier across full world width (Zone 3)
+    mapObjects.push({ x: 0, y: (SCREEN_SIZE * 3) + 30, w: WORLD_WIDTH, h: 210, type: 'water_barrier', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: -1 });
+
+    for (let lot = 0; lot < WORLD_COLS; lot++) {
+      let ox = lot * SCREEN_SIZE;
+
+      // 1. Zone 0: Deep Woodlands (Reduced count: 12 trees)
+      let trees = 0, attempts = 0;
+      while (trees < 12 && attempts < 100) {
+        let x = ox + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
+        let y = Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
+        if (!isSpaceOccupied(x, y, TILE, TILE)) {
+          mapObjects.push({ x, y, w: 16, h: 16, type: 'tree', solid: true, hitOffsetX: 4, hitOffsetY: 4, lot });
+          trees++;
+        }
+        attempts++;
+      }
+
+      // 2. Zone 1: Hay Privilege (Reduced count: 10 bushes)
+      let bushes = 0; attempts = 0;
+      while (bushes < 10 && attempts < 100) {
+        let x = ox + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
+        let y = SCREEN_SIZE + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
+        if (!isSpaceOccupied(x, y, TILE, TILE)) {
+          mapObjects.push({ x, y, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
+          bushes++;
+        }
+        attempts++;
+      }
+
+      // 3. Zone 2: Homestead & Dedicated Garden Patch
+      let cabinX = ox + 24 + Math.floor(Math.random() * 3) * 48;
+      let cabinY = (SCREEN_SIZE * 2) + 36 + Math.floor(Math.random() * 2) * 48;
+      
+      if (lot === 0 && Math.hypot(cabinX - 108, cabinY - (camera.y + 108)) < 48) {
+        cabinX = ox + 16;
+      }
+
+      mapObjects.push({ x: cabinX, y: cabinY, w: 60, h: 40, type: 'cabin', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
+
+      // Add structured Homestead Garden beside the cabin
+      let gardenX = cabinX + 64;
+      let gardenY = cabinY;
+      if (gardenX + 48 > ox + SCREEN_SIZE) gardenX = cabinX - 52;
+
+      mapObjects.push({ x: gardenX, y: gardenY, w: 48, h: 40, type: 'garden_soil', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot });
+      
+      if (!isSpaceOccupied(gardenX + 4, gardenY + 8, TILE, TILE)) {
+        mapObjects.push({ x: gardenX + 4, y: gardenY + 8, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
+      }
+      if (!isSpaceOccupied(gardenX + 24, gardenY + 8, TILE, TILE)) {
+        mapObjects.push({ x: gardenX + 24, y: gardenY + 8, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
+      }
+
+      // 4. Random Wolf Spawn per Riverlot (Zones 0, 1, or 2)
+      let wolfZoneY = Math.floor(Math.random() * 3) * SCREEN_SIZE;
+      let wolfX = ox + 36 + Math.random() * 140;
+      let wolfY = wolfZoneY + 36 + Math.random() * 140;
+      enemies.push({ x: wolfX, y: wolfY, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot, bounceX: 0, bounceY: 0, hp: 1 });
+    }
+  }
+
+  function isColliding(a, b) {
+    let bx = b.x + (b.hitOffsetX || 0);
+    let by = b.y + (b.hitOffsetY || 0);
+    return (a.x < bx + b.w && a.x + a.w > bx &&
+            a.y < by + b.h && a.y + a.h > by);
+  }
+
+  function tryMove(dx, dy) {
+    if (isShifting || player.slashing) return; 
+    
+    player.x += dx;
+    player.y += dy;
+
+    if (player.x < 0) player.x = 0;
+    if (player.x + player.w > WORLD_WIDTH) player.x = WORLD_WIDTH - player.w;
+    if (player.y < 0) player.y = 0;
+    if (player.y + player.h > WORLD_HEIGHT) player.y = WORLD_HEIGHT - player.h;
+
+    for(let obj of mapObjects) {
+      if(obj.solid && isColliding(player, obj)) {
+        player.x -= dx;
+        player.y -= dy;
+        return;
+      }
+    }
+
+    let currentCol = Math.floor(camera.x / SCREEN_SIZE);
+    let currentRow = Math.floor(camera.y / SCREEN_SIZE);
+    let playerCol = Math.floor(player.x / SCREEN_SIZE);
+    let playerRow = Math.floor(player.y / SCREEN_SIZE);
+    
+    if (playerCol !== currentCol || playerRow !== currentRow) {
+      isShifting = true;
+      shiftTargetX = playerCol * SCREEN_SIZE;
+      shiftTargetY = playerRow * SCREEN_SIZE;
+      
+      mapObjects.forEach(obj => {
+         if (obj.type === 'cut_bush') {
+             obj.type = 'bush'; 
+             obj.solid = true; 
+         }
+      });
+    }
+  }
+
+  function update() {
+    if (state !== 'PLAYING') return;
+    frame++;
+
+    // Camera Shift
+    if (isShifting) {
+      if (camera.x < shiftTargetX) camera.x = Math.min(shiftTargetX, camera.x + 8);
+      else if (camera.x > shiftTargetX) camera.x = Math.max(shiftTargetX, camera.x - 8);
+
+      if (camera.y < shiftTargetY) camera.y = Math.min(shiftTargetY, camera.y + 8);
+      else if (camera.y > shiftTargetY) camera.y = Math.max(shiftTargetY, camera.y - 8);
+
+      if (camera.x === shiftTargetX && camera.y === shiftTargetY) isShifting = false;
+    } else {
+      if (player.dx !== 0 || player.dy !== 0) {
+        tryMove(player.dx, player.dy);
+        if (frame % 8 === 0) player.animFrame = 1 - player.animFrame;
+      } else {
+        player.animFrame = 0; 
+      }
+    }
+
+    if (player.slashing) {
+      player.slashTimer--;
+      if (player.slashTimer <= 0) player.slashing = false;
+    }
+
+    // Energy Replenishment (Player's Homestead)
+    let playerCol = Math.floor(player.x / SCREEN_SIZE);
+    let playerRow = Math.floor(player.y / SCREEN_SIZE);
+    if (playerCol === 0 && playerRow === 2 && frame % 60 === 0 && energy < MAX_ENERGY) {
+      energy++;
+      updateUI();
+    }
+
+    // Loot Collection
+    for(let i=drops.length-1; i>=0; i--) {
+      let d = drops[i];
+      if (isColliding(player, d)) {
+        inventory++;
+        drops.splice(i, 1);
+        updateUI();
+      }
+    }
+
+    // Enemies Logic & Bounce Mechanics
+    for(let i=enemies.length-1; i>=0; i--) {
+      let e = enemies[i];
+
+      // Handle active hit bounce decay
+      if (Math.abs(e.bounceX) > 0.1 || Math.abs(e.bounceY) > 0.1) {
+        e.x += e.bounceX;
+        e.y += e.bounceY;
+        e.bounceX *= 0.8;
+        e.bounceY *= 0.8;
+      } else {
+        e.bounceX = 0;
+        e.bounceY = 0;
+
+        e.changeTimer--;
+        if (e.changeTimer <= 0) {
+          e.dx = (Math.random() > 0.5 ? 1 : -1) * (Math.random() > 0.3 ? 1 : 0);
+          e.dy = (Math.random() > 0.5 ? 1 : -1) * (Math.random() > 0.3 ? 1 : 0);
+          e.changeTimer = Math.floor(Math.random() * 60) + 30;
+        }
+        
+        e.x += e.dx;
+        e.y += e.dy;
+      }
+
+      // Check collision with obstacles / water (Enemy bounce off solid objects)
+      for (let obj of mapObjects) {
+        if (obj.solid && isColliding(e, obj)) {
+          e.x -= e.dx * 2;
+          e.y -= e.dy * 2;
+          e.dx *= -1;
+          e.dy *= -1;
+          break;
+        }
+      }
+
+      // Enemy Bounds Check (Stay out of river water)
+      let minX = e.lot * SCREEN_SIZE;
+      let maxX = minX + SCREEN_SIZE - e.w;
+      if (e.x < minX || e.x > maxX) { e.dx *= -1; e.x += e.dx; }
+      if (e.y < 0 || e.y > SCREEN_SIZE * 3 + 10) { e.dy *= -1; e.y += e.dy; }
+
+      // Enemy Hit Player (Deplete energy & bounce both apart)
+      if (isColliding(player, e) && !isShifting) {
+        energy = Math.max(0, energy - 10);
+        updateUI();
+
+        // Bounce trajectory
+        let angle = Math.atan2(e.y - player.y, e.x - player.x);
+        e.bounceX = Math.cos(angle) * 8;
+        e.bounceY = Math.sin(angle) * 8;
+        player.x -= Math.cos(angle) * 6;
+        player.y -= Math.sin(angle) * 6;
+      }
+    }
+  }
+
+  function doAction() {
+    if (state !== 'PLAYING' || isShifting || player.slashing) return;
+    if (energy <= 0) return; 
+
+    energy--;
+    player.slashing = true;
+    player.slashTimer = 10;
+    updateUI();
+
+    let hitbox = { x: player.x, y: player.y, w: 24, h: 24 };
+    if (player.dir === 'up') hitbox.y -= 16;
+    if (player.dir === 'down') hitbox.y += 16;
+    if (player.dir === 'left') hitbox.x -= 16;
+    if (player.dir === 'right') hitbox.x += 16;
+
+    // Slash Bushes
+    for (let obj of mapObjects) {
+      if (obj.type === 'bush' && isColliding(hitbox, obj)) {
+        obj.type = 'cut_bush';
+        obj.solid = false; 
+        if (Math.random() > 0.6) drops.push({ x: obj.x + 4, y: obj.y + 4, w: 16, h: 16 });
+      }
+    }
+
+    // Slash Enemies (Apply weapon hit bounce / knockback)
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      let e = enemies[i];
+      if (isColliding(hitbox, e)) {
+        let angle = Math.atan2(e.y - player.y, e.x - player.x);
+        e.bounceX = Math.cos(angle) * 12;
+        e.bounceY = Math.sin(angle) * 12;
+        
+        e.hp--;
+        if (e.hp <= 0) {
+          drops.push({ x: e.x, y: e.y, w: 16, h: 16 });
+          enemies.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  function draw() {
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+
+    // Draw Zone Environments
+    for (let c = 0; c < WORLD_COLS; c++) {
+      let xOff = c * SCREEN_SIZE;
+      for (let r = 0; r < WORLD_ROWS; r++) {
+        let yOff = r * SCREEN_SIZE;
+        
+        if (r === 0 || r === 1) {
+          ctx.fillStyle = C.GRASS;
+          ctx.fillRect(xOff, yOff, SCREEN_SIZE, SCREEN_SIZE);
+          ctx.fillStyle = C.GRASS_LIGHT;
+          for(let g=0; g<12; g++) {
+             let gx = (c*17 + r*13 + g*31) % SCREEN_SIZE; 
+             let gy = (c*23 + r*19 + g*47) % SCREEN_SIZE;
+             ctx.fillRect(xOff + gx, yOff + gy, 4, 4);
+          }
+        } else if (r === 2) {
+          ctx.fillStyle = C.DIRT;
+          ctx.fillRect(xOff, yOff, SCREEN_SIZE, SCREEN_SIZE);
+        } else if (r === 3) {
+          // Shoreline Bank
+          ctx.fillStyle = C.DIRT;
+          ctx.fillRect(xOff, yOff, SCREEN_SIZE, 20); 
+
+          // Dithered Pixel Gradient Shoreline (Dirt to Sand to Water)
+          for (let px = 0; px < SCREEN_SIZE; px += 4) {
+            ctx.fillStyle = (px % 8 === 0) ? C.SHORE_SAND : C.DIRT_DARK;
+            ctx.fillRect(xOff + px, yOff + 20, 4, 4);
+            ctx.fillStyle = (px % 8 === 4) ? C.WATER : C.SHORE_SAND;
+            ctx.fillRect(xOff + px, yOff + 24, 4, 4);
+            ctx.fillStyle = (px % 8 === 0) ? C.WATER : C.WATER_LIGHT;
+            ctx.fillRect(xOff + px, yOff + 28, 4, 4);
+          }
+
+          // Red River Water
+          ctx.fillStyle = C.WATER;
+          ctx.fillRect(xOff, yOff + 32, SCREEN_SIZE, 208); 
+          ctx.fillStyle = C.WATER_LIGHT;
+          ctx.fillRect(xOff + ((Date.now()/20)%240), yOff+60, 16, 2);
+          ctx.fillRect(xOff + ((Date.now()/15+100)%240), yOff+120, 12, 2);
+        }
+      }
+    }
+
+    // Draw Map Objects
+    for (let obj of mapObjects) {
+      if (obj.type === 'tree') {
+        drawSprite(obj.x, obj.y, sprTree, {1:C.LEAVES, 2:C.GRASS_LIGHT, 3:C.WOOD});
+      } else if (obj.type === 'bush') {
+        drawSprite(obj.x, obj.y, sprBush, {1:C.LEAVES, 2:C.GRASS_LIGHT});
+      } else if (obj.type === 'cut_bush') {
+        ctx.fillStyle = C.STUMP;
+        ctx.fillRect(obj.x+8, obj.y+10, 8, 8);
+      } else if (obj.type === 'cabin') {
+        ctx.fillStyle = C.WOOD; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        ctx.fillStyle = C.WOOD_LIGHT; ctx.fillRect(obj.x+4, obj.y+4, obj.w-8, obj.h-8);
+        ctx.fillStyle = '#000'; ctx.fillRect(obj.x+24, obj.y+20, 12, 20); 
+      } else if (obj.type === 'garden_soil') {
+        ctx.fillStyle = C.DIRT_DARK;
+        ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        ctx.fillStyle = C.DIRT;
+        for (let gy = 4; gy < obj.h; gy += 8) {
+          ctx.fillRect(obj.x, obj.y + gy, obj.w, 2);
+        }
+      }
+    }
+
+    // Draw Drops
+    for (let d of drops) drawSprite(d.x, d.y, sprLoot, {1:C.WOOD, 2:C.GOLD});
+
+    // Draw Enemies
+    for (let e of enemies) {
+      drawSprite(e.x, e.y, sprWolf, {1:'#000', 2:C.WOLF_FUR, 3:C.WOLF_EYE});
+    }
+
+    // Draw Sword Slash Effect
+    if (player.slashing) {
+      ctx.fillStyle = '#fff';
+      if (player.dir === 'up') ctx.fillRect(player.x+6, player.y-10, 6, 12);
+      else if (player.dir === 'down') ctx.fillRect(player.x+6, player.y+18, 6, 12);
+      else if (player.dir === 'left') ctx.fillRect(player.x-10, player.y+8, 12, 6);
+      else if (player.dir === 'right') ctx.fillRect(player.x+16, player.y+8, 12, 6);
+    }
+    
+    // Draw Character (Blue Capot, Red Sash)
+    let currentAnim = sprPlayerDown[player.animFrame];
+    drawSprite(player.x - 3, player.y - 4, currentAnim, {1:C.WOOD, 2:C.SKIN, 3:C.CAPOT_BLUE, 4:C.SASH_RED});
+
+    ctx.restore();
+  }
+
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function updateUI() {
+    scoreDisplay.innerText = `GOODS: ${inventory}`;
+    energyFill.style.width = Math.min(100, Math.max(0, (energy/MAX_ENERGY)*100)) + '%';
+  }
+
+  function startGame() {
+    state = 'PLAYING';
+    inventory = 0;
+    energy = 100;
+    generateMap();
+    updateUI();
+    introScreen.style.display = 'none';
+  }
+
+  window.addEventListener('message', function(event) {
+    const cmd = event.data;
+    if (cmd === 'BUTTON_A') {
+      if (state === 'START') startGame();
+      else doAction();
+    }
+    if (cmd === 'DPAD_UP') { player.dy = -player.speed; player.dir = 'up'; }
+    else if (cmd === 'DPAD_DOWN') { player.dy = player.speed; player.dir = 'down'; }
+    else if (cmd === 'DPAD_LEFT') { player.dx = -player.speed; player.dir = 'left'; }
+    else if (cmd === 'DPAD_RIGHT') { player.dx = player.speed; player.dir = 'right'; }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if(e.key === 'ArrowUp') { player.dy = -player.speed; player.dir = 'up'; }
+    if(e.key === 'ArrowDown') { player.dy = player.speed; player.dir = 'down'; }
+    if(e.key === 'ArrowLeft') { player.dx = -player.speed; player.dir = 'left'; }
+    if(e.key === 'ArrowRight') { player.dx = player.speed; player.dir = 'right'; }
+    if(e.key === 'a' || e.key === 'Enter') {
+      if (state === 'START') startGame();
+      else doAction();
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if(e.key === 'ArrowUp' || e.key === 'ArrowDown') player.dy = 0;
+    if(e.key === 'ArrowLeft' || e.key === 'ArrowRight') player.dx = 0;
+  });
+
+  draw();
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>
