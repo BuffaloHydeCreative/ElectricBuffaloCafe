@@ -59,15 +59,58 @@
       box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
     }
 
-    /* The DOS Style Menu Overlay */
-    #dos-menu {
+    /* Screen States */
+    .screen-layer {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: #000;
-      color: #33ff33;
-      padding: 20px;
       box-sizing: border-box;
-      display: flex;
+      display: none; /* Hidden by default, JS controls visibility */
+    }
+
+    /* State 1: Boot Splash */
+    #boot-splash {
+      background: #000;
+      z-index: 15;
+      display: flex; /* Visible on load */
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    /* Boot Splash Canvas Styling */
+    #introCanvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated; 
+      z-index: 2;
+    }
+
+    /* State 2: Static Splash */
+    #static-splash {
+      background: #000;
+      color: #00A3A4;
+      z-index: 14;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .blink-text {
+      font-size: 18px;
+      font-weight: bold;
+      animation: blinker 1.2s linear infinite;
+    }
+
+    @keyframes blinker {
+      50% { opacity: 0; }
+    }
+
+    /* State 3: The DOS Style Menu Overlay */
+    #dos-menu {
+      background: #000;
+      color: #00A3A4;
+      padding: 20px;
       flex-direction: column;
       z-index: 10;
     }
@@ -75,7 +118,7 @@
     .dos-header {
       font-weight: bold;
       margin-bottom: 15px;
-      border-bottom: 2px dashed #33ff33;
+      border-bottom: 2px dashed #00A3A4;
       padding-bottom: 5px;
     }
 
@@ -97,7 +140,7 @@
     .dos-list li.active {
       opacity: 1;
       font-weight: bold;
-      background: #33ff33;
+      background: #00A3A4;
       color: #000;
     }
 
@@ -110,14 +153,11 @@
       content: "> ";
     }
 
-    /* Game iFrame */
+    /* State 4: Game iFrame */
     #arcade-frame {
       width: 100%;
       height: 100%;
       border: none;
-      display: none;
-      position: absolute;
-      top: 0; left: 0;
       z-index: 5;
     }
 
@@ -159,7 +199,7 @@
       border: 4px solid #050505;
       box-shadow: inset 0 5px 15px rgba(0,0,0,0.9), 0 2px 5px rgba(255,255,255,0.1);
       position: relative;
-      touch-action: none; /* Prevents scrolling while dragging */
+      touch-action: none; 
       cursor: grab;
     }
 
@@ -167,7 +207,6 @@
       cursor: grabbing;
     }
 
-    /* The Stick Itself */
     .joystick-stick {
       width: 65px; 
       height: 65px;
@@ -176,13 +215,13 @@
       position: absolute;
       top: 27.5px; left: 27.5px; 
       box-shadow: 8px 12px 15px rgba(0,0,0,0.6), inset -5px -5px 15px rgba(0,0,0,0.7);
-      pointer-events: none; /* Allows base to catch all drag events */
-      transition: transform 0.15s ease-out; /* Smooth snap back */
+      pointer-events: none; 
+      transition: transform 0.15s ease-out; 
       z-index: 1;
     }
 
     .joystick-stick.dragging {
-      transition: none; /* Instantly follow finger/mouse */
+      transition: none; 
     }
 
     /* Concave Action Buttons */
@@ -224,8 +263,8 @@
       box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 0 0 #050505, 0 4px 6px rgba(0,0,0,0.6);
     }
 
-    .btn-b { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #e0a800; margin-top: 25px; }
-    .btn-a { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #cc0000; }
+    .btn-b { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #D63333; margin-top: 25px; }
+    .btn-a { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #00A3A4; }
 
     .btn-label {
       font-size: 12px;
@@ -244,46 +283,36 @@
       z-index: 4; 
     }
 
-    /* 90s Coin Insert Plate */
-    .coin-door {
-      background: #1a1a1a;
-      border: 2px solid #000;
-      border-radius: 3px;
-      padding: 5px 10px;
-      box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 2px 4px rgba(255,255,255,0.05);
+    /* Subtle Home/Start Button */
+    .home-container {
       display: flex;
       flex-direction: column;
       align-items: center;
+      gap: 6px;
     }
 
-    .coin-btn {
-      width: 22px;
-      height: 30px;
-      background: rgba(230, 60, 20, 0.85);
-      border: 2px solid #050505;
-      border-radius: 3px;
+    .home-btn {
+      width: 45px;
+      height: 20px;
+      background: #333;
+      border-radius: 10px;
+      border: 2px solid #111;
       cursor: pointer;
-      box-shadow: inset 0 0 6px rgba(255,180,100,0.6), inset 0 0 2px rgba(0,0,0,0.8), 0 2px 0 #000;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
+      box-shadow: inset 0 2px 4px rgba(255,255,255,0.05), 0 4px 0 #000;
       touch-action: none;
     }
 
-    .coin-btn:active {
+    .home-btn:active {
       transform: translateY(4px);
-      box-shadow: inset 0 0 6px rgba(255,180,100,0.6), inset 0 0 2px rgba(0,0,0,0.8), 0 0 0 #000;
+      box-shadow: inset 0 2px 4px rgba(255,255,255,0.05), 0 0 0 #000;
     }
 
-    .coin-text {
+    .home-label {
+      font-size: 10px;
+      font-weight: bold;
+      color: #666;
+      letter-spacing: 1px;
       font-family: Arial, sans-serif;
-      font-weight: 600; 
-      font-size: 5px;
-      color: rgba(255, 255, 255, 0.95);
-      text-shadow: 0 0 2px rgba(255,255,255,0.6);
-      line-height: 1.2;
     }
   </style>
 </head>
@@ -294,7 +323,19 @@
     <!-- 1. CRT MONITOR -->
     <div class="monitor-bezel">
       <div class="crt-screen">
-        <div id="dos-menu">
+        
+        <!-- State 1: Animated Boot Up -->
+        <div id="boot-splash" class="screen-layer">
+          <canvas id="introCanvas" width="600" height="450"></canvas>
+        </div>
+
+        <!-- State 2: Static Press Start -->
+        <div id="static-splash" class="screen-layer">
+          <div class="blink-text">PRESS A TO START</div>
+        </div>
+
+        <!-- State 3: OS Menu -->
+        <div id="dos-menu" class="screen-layer">
           <div class="dos-header">ElectricBuffalo.EXE<br>RAM OK...</div>
           <ul class="dos-list" id="game-list">
             <li class="active">Red River Run.html</li>
@@ -306,7 +347,10 @@
             <li>game7.html</li>
           </ul>
         </div>
-        <iframe id="arcade-frame" title="Game Screen"></iframe>
+
+        <!-- State 4: Game Player -->
+        <iframe id="arcade-frame" class="screen-layer" title="Game Screen"></iframe>
+
       </div>
     </div>
 
@@ -333,16 +377,19 @@
 
     <!-- 3. FRONT PANEL -->
     <div class="front-panel">
-      <div class="coin-door">
-        <div class="coin-btn" onmousedown="btnHome()" ontouchstart="preventGhostClick(event, 'HOME')">
-          <span class="coin-text">INSERT<br>COIN</span>
-        </div>
+      <!-- Subtle Home/Start Button -->
+      <div class="home-container">
+        <div class="home-btn" onmousedown="btnHome()" ontouchstart="preventGhostClick(event, 'HOME')"></div>
+        <span class="home-label">HOME</span>
       </div>
     </div>
 
   </div>
 
   <script>
+    // System State Tracker (BOOT -> STATIC -> MENU -> PLAYING)
+    let machineState = 'BOOT';
+    
     let currentIndex = 0;
     const games = [
       'game1.html', 'game2.html', 'game3.html', 
@@ -350,9 +397,18 @@
     ];
     let isPlaying = false;
 
-    const listItems = document.querySelectorAll('#game-list li');
+    // DOM Elements
+    const bootSplash = document.getElementById('boot-splash');
+    const staticSplash = document.getElementById('static-splash');
     const dosMenu = document.getElementById('dos-menu');
     const gameFrame = document.getElementById('arcade-frame');
+    const listItems = document.querySelectorAll('#game-list li');
+
+    function transitionToStatic() {
+      machineState = 'STATIC';
+      bootSplash.style.display = 'none';
+      staticSplash.style.display = 'flex';
+    }
 
     function sendSignal(command) {
       if (isPlaying) {
@@ -374,9 +430,9 @@
     }
 
     function pressDpad(directionStr) {
-      if (isPlaying) {
+      if (machineState === 'PLAYING') {
         sendSignal(directionStr);
-      } else {
+      } else if (machineState === 'MENU') {
         if (directionStr === 'DPAD_UP') moveMenu(-1);
         if (directionStr === 'DPAD_DOWN') moveMenu(1);
       }
@@ -391,23 +447,32 @@
     }
 
     function btnAction(buttonStr) {
-      if (isPlaying) {
+      if (machineState === 'PLAYING') {
         sendSignal(buttonStr);
-      } else {
-        if (buttonStr === 'BUTTON_A') {
-          dosMenu.style.display = 'none';
-          gameFrame.style.display = 'block';
-          gameFrame.src = games[currentIndex];
-          isPlaying = true;
-        }
+      } else if (machineState === 'STATIC' && buttonStr === 'BUTTON_A') {
+        // Progress from Press Start to Menu
+        machineState = 'MENU';
+        staticSplash.style.display = 'none';
+        dosMenu.style.display = 'flex';
+      } else if (machineState === 'MENU' && buttonStr === 'BUTTON_A') {
+        // Boot selected game
+        machineState = 'PLAYING';
+        dosMenu.style.display = 'none';
+        gameFrame.style.display = 'block';
+        gameFrame.src = games[currentIndex];
+        isPlaying = true;
       }
     }
 
     function btnHome() {
-      if (isPlaying) {
+      // Home button returns directly to the Static "Press Start" screen, bypassing boot
+      if (machineState === 'PLAYING' || machineState === 'MENU') {
         gameFrame.src = ""; 
         gameFrame.style.display = 'none';
-        dosMenu.style.display = 'flex';
+        dosMenu.style.display = 'none';
+        
+        machineState = 'STATIC';
+        staticSplash.style.display = 'flex';
         isPlaying = false;
       }
     }
@@ -488,15 +553,217 @@
       joyStick.style.transform = `translate(0px, 0px)`; // Snap back to center
     }
 
-    // Attach dragging events (Window listeners ensure tracking if finger slips off base)
+    // Attach dragging events
     joyBase.addEventListener('mousedown', startDrag);
     joyBase.addEventListener('touchstart', startDrag, { passive: false });
-
     window.addEventListener('mousemove', moveDrag);
     window.addEventListener('touchmove', moveDrag, { passive: false });
-
     window.addEventListener('mouseup', endDrag);
     window.addEventListener('touchend', endDrag);
+
+    /* --- ANIMATED BOOT SPLASH LOGIC --- */
+    const canvas = document.getElementById('introCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    const PALETTE = {
+        '0': null, 
+        '1': '#2d2d2d', // Dark Charcoal (Main Buffalo Body)
+        '2': '#ffffff', // White (Horns/Hooves)
+        '3': '#12AEA2', // Teal (Beard/Accents)
+        '4': '#AD1C21', // Crimson Red Text
+        '5': '#F7C844', // Gold Sparkle
+        '6': '#ffffff', // White Sparkle Center
+        '7': '#12AEA2'  // Teal (Prompt text)
+    };
+
+    const BUFFALO_SPRITE = [
+        "0000000000000000",
+        "0000000011100000",
+        "0000000111120000",
+        "0000011111121000",
+        "0000111111111000",
+        "0001111111111000",
+        "0001111111111000",
+        "0001111111133000",
+        "0001111111130000",
+        "0000111111100000",
+        "0000100100100000",
+        "0000100100100000",
+        "0000000000000000",
+        "0000000000000000",
+        "0000000000000000",
+        "0000000000000000"
+    ];
+
+    let splashState = 'WAITING'; 
+    let animStartTime = 0;
+    let audioCtx = null;
+
+    // Starts animation on any tap during the BOOT phase
+    window.addEventListener('click', () => {
+        if (machineState === 'BOOT' && splashState === 'WAITING') {
+            initAudio();
+            playKaChing();
+            splashState = 'PLAYING';
+            animStartTime = performance.now();
+        }
+    });
+
+    // Also allow touchstart for faster response on mobile
+    window.addEventListener('touchstart', () => {
+        if (machineState === 'BOOT' && splashState === 'WAITING') {
+            initAudio();
+            playKaChing();
+            splashState = 'PLAYING';
+            animStartTime = performance.now();
+        }
+    }, {passive: true});
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playKaChing() {
+        if (!audioCtx) return;
+        playTone(987.77, 0, 0.1, 'square');
+        playTone(1318.51, 0.1, 0.6, 'sine');
+    }
+
+    function playTone(frequency, delay, duration, type) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(frequency, audioCtx.currentTime + delay);
+        gain.gain.setValueAtTime(0, audioCtx.currentTime + delay);
+        gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + delay + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + delay);
+        osc.stop(audioCtx.currentTime + delay + duration);
+    }
+
+    function drawMatrix(matrix, startX, startY, pixelSize, alpha = 1.0) {
+        ctx.globalAlpha = alpha;
+        for (let y = 0; y < matrix.length; y++) {
+            for (let x = 0; x < matrix[y].length; x++) {
+                const colorCode = matrix[y][x];
+                if (colorCode !== '0' && PALETTE[colorCode]) {
+                    ctx.fillStyle = PALETTE[colorCode];
+                    ctx.fillRect(startX + (x * pixelSize), startY + (y * pixelSize), pixelSize, pixelSize);
+                }
+            }
+        }
+        ctx.globalAlpha = 1.0;
+    }
+
+    function drawSparkle(x, y, scale, rotation) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+        ctx.scale(scale, scale);
+        ctx.fillStyle = PALETTE['5']; 
+        ctx.fillRect(-2, -10, 4, 20);
+        ctx.fillRect(-10, -2, 20, 4);
+        ctx.fillStyle = PALETTE['6']; 
+        ctx.fillRect(-1, -1, 2, 2);
+        ctx.restore();
+    }
+
+    function gameLoop(timestamp) {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (splashState === 'WAITING' && machineState === 'BOOT') {
+            const blink = Math.floor(timestamp / 500) % 2 === 0;
+            if (blink) {
+                ctx.fillStyle = PALETTE['7'];
+                ctx.font = 'bold 24px "Courier New"';
+                ctx.textAlign = 'center';
+                ctx.fillText("POWER ON", canvas.width / 2, canvas.height / 2 - 10);
+                ctx.font = '16px "Courier New"';
+                ctx.fillText("(TAP ANYWHERE TO START)", canvas.width / 2, canvas.height / 2 + 25);
+            }
+        } 
+        else if (splashState === 'PLAYING') {
+            const elapsed = (timestamp - animStartTime) / 1000; 
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2 - 40; 
+            
+            let currentScale = 0;
+            let currentRotation = 0;
+            
+            if (elapsed < 1.2) {
+                const t = elapsed / 1.2;
+                const easeOut = 1 - Math.pow(1 - t, 3);
+                currentScale = easeOut * 1.0; 
+                currentRotation = (1 - easeOut) * Math.PI * 4; 
+            } 
+            else if (elapsed < 2.5) {
+                currentScale = 1.0;
+                currentRotation = 0;
+            }
+            else if (elapsed < 5.0) {
+                const t = (elapsed - 2.5) / 2.5;
+                currentScale = 1.0 + Math.pow(t * 10, 3); 
+                currentRotation = 0;
+            }
+            else {
+                splashState = 'DONE';
+                transitionToStatic(); // Automatically move to the static arcade menu state
+            }
+
+            if (splashState === 'PLAYING') {
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(currentRotation);
+                ctx.scale(currentScale, currentScale);
+                
+                const pSize = 12; 
+                const spriteW = BUFFALO_SPRITE[0].length * pSize;
+                const spriteH = BUFFALO_SPRITE.length * pSize;
+                
+                drawMatrix(BUFFALO_SPRITE, -spriteW/2, -spriteH/2, pSize);
+
+                // BuffaloHyde Creative Text
+                ctx.fillStyle = PALETTE['4'];
+                ctx.textAlign = 'center';
+                ctx.letterSpacing = "-1px";
+                
+                ctx.font = 'bold 36px "Courier New"';
+                ctx.fillText("BUFFALOHYDE", 0, spriteH/2 + 20);
+                
+                ctx.font = 'bold 24px "Courier New"';
+                ctx.fillText("CREATIVE", 0, spriteH/2 + 50);
+                
+                ctx.letterSpacing = "0px"; 
+
+                ctx.restore();
+
+                // Sparkles
+                if (elapsed > 1.2 && elapsed < 2.0) {
+                    const sparkleLife = elapsed - 1.2;
+                    if (sparkleLife < 0.6) {
+                        const scale = Math.sin((sparkleLife / 0.6) * Math.PI); 
+                        const rot = sparkleLife * Math.PI; 
+                        drawSparkle(centerX - 80, centerY - 40, scale, rot);
+                        drawSparkle(centerX + 90, centerY + 20, scale, -rot);
+                        drawSparkle(centerX - 40, centerY + 80, scale * 0.8, rot * 1.5);
+                    }
+                }
+            }
+        }
+
+        if(splashState !== 'DONE') {
+          requestAnimationFrame(gameLoop);
+        }
+    }
+
+    requestAnimationFrame(gameLoop);
 
   </script>
 
