@@ -70,8 +70,8 @@
     <canvas id="gameCanvas" width="240" height="240"></canvas>
     
     <div id="intro-screen" class="overlay">
-      <h2>Riverlot & Upper Fort Garry</h2>
-      <p>Explore your lot, neighbor's land & Upper Fort Garry.<br>Harvest garden veggies & hay (-1 Energy).<br>Beware of wild wolves in the woods!<br>Rest at the Homestead cabin to recharge.</p>
+      <h2>Riverlot & The Forks</h2>
+      <p>Explore riverlots, Upper Fort Garry & St. Boniface.<br>Cross the Assiniboine River using the ferry boat.<br>Harvest garden veggies & hay (-1 Energy).<br>Rest at the Homestead cabin to recharge.</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
   </div>
@@ -87,7 +87,7 @@
   
   const TILE = 24; 
   const SCREEN_SIZE = 240; 
-  const WORLD_COLS = 3; // Lot 0 (Player), Lot 1 (Neighbor), Lot 2 (Upper Fort Garry / The Forks)
+  const WORLD_COLS = 4; // Lot 0 (Player), Lot 1 (Neighbor), Lot 2 (Upper Fort Garry), Lot 3 (Saint Boniface)
   const WORLD_ROWS = 4; // Woods, Hay Privilege, Homestead/Town, Scenic River
   const WORLD_WIDTH = SCREEN_SIZE * WORLD_COLS;
   const WORLD_HEIGHT = SCREEN_SIZE * WORLD_ROWS; 
@@ -210,14 +210,23 @@
     // Red River Water Barrier across full bottom of world (Zone 3)
     mapObjects.push({ x: 0, y: (SCREEN_SIZE * 3) + 30, w: WORLD_WIDTH, h: 210, type: 'water_barrier', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: -1 });
 
-    // Vertical Assiniboine River Water Barrier in Lot 2 (Runs slightly left-leaning through Zones 0, 1, 2 into Red River)
-    mapObjects.push({ x: SCREEN_SIZE * 2 + 180, y: 0, w: 36, h: SCREEN_SIZE * 3 + 30, type: 'assiniboine_river', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
+    // Vertical Assiniboine River Water Barrier (Doubled width to 72px, cutting through Lots 2 & 3)
+    let assx = SCREEN_SIZE * 2 + 160;
+    
+    // Top segment of Assiniboine River (above ferry crossing)
+    mapObjects.push({ x: assx, y: 0, w: 72, h: SCREEN_SIZE * 2 + 80, type: 'assiniboine_river', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
+    
+    // Ferry Crossing Boat (Non-solid bridge over river at town center)
+    mapObjects.push({ x: assx - 4, y: SCREEN_SIZE * 2 + 80, w: 80, h: 48, type: 'ferry', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
+    
+    // Bottom segment of Assiniboine River (below ferry crossing into Red River)
+    mapObjects.push({ x: assx, y: SCREEN_SIZE * 2 + 128, w: 72, h: SCREEN_SIZE + 30, type: 'assiniboine_river', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
 
     // --- LOT 0 & 1 (Player & Neighbor Riverlots) ---
     for (let lot = 0; lot < 2; lot++) {
       let ox = lot * SCREEN_SIZE;
 
-      // 1. Zone 0: Deep Woodlands
+      // Zone 0: Deep Woodlands
       let trees = 0, attempts = 0;
       while (trees < 10 && attempts < 100) {
         let x = ox + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
@@ -229,7 +238,7 @@
         attempts++;
       }
 
-      // 2. Zone 1: Hay Privilege
+      // Zone 1: Hay Privilege
       let bushes = 0; attempts = 0;
       while (bushes < 8 && attempts < 100) {
         let x = ox + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
@@ -241,7 +250,7 @@
         attempts++;
       }
 
-      // 3. Zone 2: Homestead & Garden
+      // Zone 2: Homestead & Garden
       let cabinX = ox + 24 + Math.floor(Math.random() * 2) * 48;
       let cabinY = (SCREEN_SIZE * 2) + 36 + Math.floor(Math.random() * 2) * 48;
       if (lot === 0 && Math.hypot(cabinX - 96, cabinY - (camera.y + 96)) < 48) cabinX = ox + 24;
@@ -262,7 +271,7 @@
         }
       }
 
-      // 4. Wild Wolf Enemies (2 per riverlot)
+      // Wild Wolf Enemies (2 per riverlot)
       for (let eCount = 0; eCount < 2; eCount++) {
         let isWoodSpawn = Math.random() < 0.7;
         let wolfZoneY = isWoodSpawn ? 0 : Math.floor(Math.random() * 2 + 1) * SCREEN_SIZE;
@@ -272,42 +281,49 @@
       }
     }
 
-    // --- LOT 2 (The Forks & Upper Fort Garry) ---
+    // --- LOT 2 (Upper Fort Garry - West Bank Village) ---
     let fortOx = SCREEN_SIZE * 2;
+    
+    // 2-House Simplified Village in Upper Fort Garry (Lot 2 Zone 2)
+    mapObjects.push({ x: fortOx + 24,  y: SCREEN_SIZE * 2 + 36, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'STORE' });
+    mapObjects.push({ x: fortOx + 24,  y: SCREEN_SIZE * 2 + 130, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'FORT' });
 
-    // Upper Fort Garry 2x2 Building Grid in Zone 2 (Town Zone)
-    let fortBuildings = [
-      { x: fortOx + 24,  y: SCREEN_SIZE * 2 + 24, w: 50, h: 36, label: 'STORE' },
-      { x: fortOx + 100, y: SCREEN_SIZE * 2 + 24, w: 50, h: 36, label: 'FORT' },
-      { x: fortOx + 24,  y: SCREEN_SIZE * 2 + 120, w: 50, h: 36, label: 'HALL' },
-      { x: fortOx + 100, y: SCREEN_SIZE * 2 + 120, w: 50, h: 36, label: 'POST' }
-    ];
-
-    fortBuildings.forEach(b => {
-      mapObjects.push({ x: b.x, y: b.y, w: b.w, h: b.h, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: b.label });
-    });
-
-    // Zone 1: Tall Grass / Prairie Hazard Area in Upper Fort Garry
-    for (let bCount = 0; bCount < 6; bCount++) {
-      let bx = fortOx + 24 + (bCount % 3) * 48;
-      let by = SCREEN_SIZE + 36 + Math.floor(bCount / 3) * 48;
+    // Zone 1 & 0 in Upper Fort Garry
+    for (let bCount = 0; bCount < 4; bCount++) {
+      let bx = fortOx + 24 + (bCount % 2) * 60;
+      let by = SCREEN_SIZE + 48 + Math.floor(bCount / 2) * 60;
       if (!isSpaceOccupied(bx, by, TILE, TILE)) {
         mapObjects.push({ x: bx, y: by, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
       }
     }
 
-    // Zone 0: Wooded Enemy Zone in Upper Fort Garry (Higher Wolf Density: 3 wolves)
-    for (let wTree = 0; wTree < 8; wTree++) {
-      let tx = fortOx + 24 + (wTree % 4) * 36;
-      let ty = 24 + Math.floor(wTree / 4) * 48;
+    for (let wTree = 0; wTree < 6; wTree++) {
+      let tx = fortOx + 24 + (wTree % 3) * 48;
+      let ty = 24 + Math.floor(wTree / 3) * 48;
       if (!isSpaceOccupied(tx, ty, TILE, TILE)) {
         mapObjects.push({ x: tx, y: ty, w: 16, h: 16, type: 'tree', solid: true, hitOffsetX: 4, hitOffsetY: 4, lot: 2 });
       }
     }
 
-    for (let wCount = 0; wCount < 3; wCount++) {
-      enemies.push({ x: fortOx + 36 + Math.random() * 100, y: 36 + Math.random() * 120, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot: 2, bounceX: 0, bounceY: 0, hp: 1 });
+    enemies.push({ x: fortOx + 36, y: 36, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot: 2, bounceX: 0, bounceY: 0, hp: 1 });
+    enemies.push({ x: fortOx + 96, y: 100, w: 16, h: 16, dx: -1, dy: 1, changeTimer: 60, lot: 2, bounceX: 0, bounceY: 0, hp: 1 });
+
+    // --- LOT 3 (Saint Boniface - East Bank Village) ---
+    let bonOx = SCREEN_SIZE * 3;
+
+    // 2-House Simplified Village in Saint Boniface (Lot 3 Zone 2)
+    mapObjects.push({ x: bonOx + 80, y: SCREEN_SIZE * 2 + 36, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3, label: 'HALL' });
+    mapObjects.push({ x: bonOx + 80, y: SCREEN_SIZE * 2 + 130, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3, label: 'POST' });
+
+    for (let wTree = 0; wTree < 6; wTree++) {
+      let tx = bonOx + 80 + (wTree % 2) * 48;
+      let ty = 24 + Math.floor(wTree / 2) * 48;
+      if (!isSpaceOccupied(tx, ty, TILE, TILE)) {
+        mapObjects.push({ x: tx, y: ty, w: 16, h: 16, type: 'tree', solid: true, hitOffsetX: 4, hitOffsetY: 4, lot: 3 });
+      }
     }
+
+    enemies.push({ x: bonOx + 100, y: 48, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot: 3, bounceX: 0, bounceY: 0, hp: 1 });
   }
 
   function isColliding(a, b) {
@@ -397,9 +413,10 @@
       }
     }
 
-    // Dynamic Title Display based on active zone
+    // Dynamic Title Display
     let activeCol = Math.floor(player.x / SCREEN_SIZE);
-    if (activeCol === 2) titleDisplay.innerText = "UPPER FORT GARRY";
+    if (activeCol === 3) titleDisplay.innerText = "ST. BONIFACE";
+    else if (activeCol === 2) titleDisplay.innerText = "UPPER FORT GARRY";
     else if (activeCol === 1) titleDisplay.innerText = "NEIGHBOR LOT";
     else titleDisplay.innerText = "RIVERLOT";
 
@@ -536,7 +553,7 @@
              ctx.fillRect(xOff + gx, yOff + gy, 4, 4);
           }
         } else if (r === 2) {
-          ctx.fillStyle = (c === 2) ? '#5A6351' : C.DIRT; // Cobblestone/dirt town square in Upper Fort Garry
+          ctx.fillStyle = (c >= 2) ? '#5A6351' : C.DIRT; // Cobblestone town square in Upper Fort Garry & St. Boniface
           ctx.fillRect(xOff, yOff, SCREEN_SIZE, SCREEN_SIZE);
         } else if (r === 3) {
           // Shoreline Bank
@@ -562,12 +579,13 @@
       }
     }
 
-    // Draw Assiniboine River cutting vertically in Lot 2 (The Forks Confluence)
-    let assx = SCREEN_SIZE * 2 + 180;
+    // Draw Vertical Assiniboine River (Doubled Width: 72px)
+    let assx = SCREEN_SIZE * 2 + 160;
     ctx.fillStyle = C.WATER;
-    ctx.fillRect(assx, 0, 36, SCREEN_SIZE * 3 + 32);
+    ctx.fillRect(assx, 0, 72, SCREEN_SIZE * 3 + 32);
     ctx.fillStyle = C.WATER_LIGHT;
-    ctx.fillRect(assx + 10, (Date.now()/25)% (SCREEN_SIZE*3), 16, 4);
+    ctx.fillRect(assx + 12, (Date.now()/25)% (SCREEN_SIZE*3), 20, 4);
+    ctx.fillRect(assx + 40, ((Date.now()/20)+100)% (SCREEN_SIZE*3), 16, 4);
 
     // Draw Map Objects
     for (let obj of mapObjects) {
@@ -587,7 +605,15 @@
       } else if (obj.type === 'fort_building') {
         ctx.fillStyle = C.STONE; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
         ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x+2, obj.y+2, obj.w-4, 8);
-        ctx.fillStyle = '#000'; ctx.fillRect(obj.x+20, obj.y+18, 10, 18); // Door
+        ctx.fillStyle = '#000'; ctx.fillRect(obj.x+22, obj.y+18, 10, 18); 
+      } else if (obj.type === 'ferry') {
+        // Crossable Wooden Ferry Boat
+        ctx.fillStyle = C.WOOD;
+        ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        ctx.fillStyle = C.WOOD_LIGHT;
+        ctx.fillRect(obj.x + 4, obj.y + 4, obj.w - 8, obj.h - 8);
+        ctx.fillStyle = C.DIRT;
+        ctx.fillRect(obj.x, obj.y + 18, obj.w, 12); // Plank deck walkway
       } else if (obj.type === 'garden_soil') {
         ctx.fillStyle = C.DIRT_DARK;
         ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
