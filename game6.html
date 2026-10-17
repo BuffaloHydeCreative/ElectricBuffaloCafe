@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Riverlot Adventure</title>
+<title>Bonami!</title>
 <style>
   body {
     margin: 0; padding: 0;
@@ -47,7 +47,7 @@
     color: #fff; text-align: center; padding: 15px; box-sizing: border-box;
     z-index: 10;
   }
-  h2 { color: #F7C844; margin: 0 0 10px 0; font-size: 20px; text-transform: uppercase; }
+  h2 { color: #F7C844; margin: 0 0 10px 0; font-size: 18px; text-transform: uppercase; }
   p { font-size: 12px; line-height: 1.5; margin: 0 0 15px 0; color: #D4D0C5; }
   .blink-text { font-weight: bold; color: #12AEA2; font-size: 14px; animation: blink 1s infinite; }
   @keyframes blink { 50% { opacity: 0; } }
@@ -70,8 +70,8 @@
     <canvas id="gameCanvas" width="240" height="240"></canvas>
     
     <div id="intro-screen" class="overlay">
-      <h2>Riverlot</h2>
-      <p>Explore your lot & neighbor's land.<br>Harvest garden & hay crops (-1 Energy).<br>Watch out for wild wolves!<br>Rest at the Homestead cabin to recharge.</p>
+      <h2>Riverlot & Upper Fort Garry</h2>
+      <p>Explore your lot, neighbor's land & Upper Fort Garry.<br>Harvest garden veggies & hay (-1 Energy).<br>Beware of wild wolves in the woods!<br>Rest at the Homestead cabin to recharge.</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
   </div>
@@ -82,12 +82,13 @@
   const ctx = cvs.getContext('2d');
   const introScreen = document.getElementById('intro-screen');
   const scoreDisplay = document.getElementById('score-display');
+  const titleDisplay = document.getElementById('title-display');
   const energyFill = document.getElementById('energy-fill');
   
   const TILE = 24; 
   const SCREEN_SIZE = 240; 
-  const WORLD_COLS = 2; // Lot 0 (Player), Lot 1 (Neighbor)
-  const WORLD_ROWS = 4; // Woods, Hay Privilege, Homestead & Garden, Scenic River
+  const WORLD_COLS = 3; // Lot 0 (Player), Lot 1 (Neighbor), Lot 2 (Upper Fort Garry / The Forks)
+  const WORLD_ROWS = 4; // Woods, Hay Privilege, Homestead/Town, Scenic River
   const WORLD_WIDTH = SCREEN_SIZE * WORLD_COLS;
   const WORLD_HEIGHT = SCREEN_SIZE * WORLD_ROWS; 
   const FPS = 60; 
@@ -107,9 +108,13 @@
     CAPOT_BLUE: '#0F6F9E', 
     SASH_RED: '#AD1C21',   
     GOLD: '#F7C844',
+    VEGGIE_ORANGE: '#FB6604',
+    VEGGIE_GREEN: '#12AEA2',
     STUMP: '#A26D3F',
     WOLF_FUR: '#6C757D',
-    WOLF_EYE: '#AD1C21'
+    WOLF_EYE: '#AD1C21',
+    STONE: '#6A6B6E',
+    STONE_ROOF: '#3A3B3D'
   };
 
   let state = 'START'; 
@@ -123,9 +128,8 @@
   let shiftTargetY = 0;
   let frame = 0;
   
-  // Player state setup for Tile-Based Snapping Movement
   let player = { 
-    x: 96, y: camera.y + 96, // Snap to grid multiple of 24
+    x: 96, y: camera.y + 96, 
     targetX: 96, targetY: camera.y + 96,
     w: 16, h: 18, 
     speed: 3, dir: 'down',
@@ -176,6 +180,7 @@
   
   const sprBush = [[0,0,1,1,1,0,0,0],[0,1,2,1,2,1,0,0],[1,2,1,2,1,2,1,0],[1,1,2,1,2,1,1,0],[1,2,1,2,1,2,1,0],[1,1,1,1,1,1,1,0],[0,1,1,1,1,1,0,0],[0,0,0,0,0,0,0,0]]; 
   const sprTree = [[0,0,1,1,1,1,0,0],[0,1,2,1,1,2,1,0],[1,1,1,2,2,1,1,1],[1,2,1,1,1,1,2,1],[1,1,1,2,2,1,1,1],[0,1,1,1,1,1,1,0],[0,0,0,3,3,0,0,0],[0,0,0,3,3,0,0,0]]; 
+  const sprVeggie = [[0,0,0,1,1,0,0,0],[0,0,1,1,1,1,0,0],[0,0,0,2,2,0,0,0],[0,0,2,2,2,2,0,0],[0,2,2,2,2,2,2,0],[0,0,2,2,2,2,0,0],[0,0,0,2,2,0,0,0],[0,0,0,0,0,0,0,0]];
   const sprLoot = [[0,0,0,0,0,0,0,0],[0,0,1,1,1,0,0,0],[0,1,2,2,2,1,0,0],[0,1,2,2,2,1,0,0],[0,1,2,2,2,1,0,0],[0,0,1,1,1,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]; 
 
   const sprWolf = [
@@ -202,13 +207,19 @@
     mapObjects = [];
     enemies = [];
 
+    // Red River Water Barrier across full bottom of world (Zone 3)
     mapObjects.push({ x: 0, y: (SCREEN_SIZE * 3) + 30, w: WORLD_WIDTH, h: 210, type: 'water_barrier', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: -1 });
 
-    for (let lot = 0; lot < WORLD_COLS; lot++) {
+    // Vertical Assiniboine River Water Barrier in Lot 2 (Runs slightly left-leaning through Zones 0, 1, 2 into Red River)
+    mapObjects.push({ x: SCREEN_SIZE * 2 + 180, y: 0, w: 36, h: SCREEN_SIZE * 3 + 30, type: 'assiniboine_river', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
+
+    // --- LOT 0 & 1 (Player & Neighbor Riverlots) ---
+    for (let lot = 0; lot < 2; lot++) {
       let ox = lot * SCREEN_SIZE;
 
+      // 1. Zone 0: Deep Woodlands
       let trees = 0, attempts = 0;
-      while (trees < 12 && attempts < 100) {
+      while (trees < 10 && attempts < 100) {
         let x = ox + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
         let y = Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
         if (!isSpaceOccupied(x, y, TILE, TILE)) {
@@ -218,8 +229,9 @@
         attempts++;
       }
 
+      // 2. Zone 1: Hay Privilege
       let bushes = 0; attempts = 0;
-      while (bushes < 10 && attempts < 100) {
+      while (bushes < 8 && attempts < 100) {
         let x = ox + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
         let y = SCREEN_SIZE + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
         if (!isSpaceOccupied(x, y, TILE, TILE)) {
@@ -229,32 +241,72 @@
         attempts++;
       }
 
-      let cabinX = ox + 24 + Math.floor(Math.random() * 3) * 48;
+      // 3. Zone 2: Homestead & Garden
+      let cabinX = ox + 24 + Math.floor(Math.random() * 2) * 48;
       let cabinY = (SCREEN_SIZE * 2) + 36 + Math.floor(Math.random() * 2) * 48;
-      
-      if (lot === 0 && Math.hypot(cabinX - 96, cabinY - (camera.y + 96)) < 48) {
-        cabinX = ox + 24;
-      }
+      if (lot === 0 && Math.hypot(cabinX - 96, cabinY - (camera.y + 96)) < 48) cabinX = ox + 24;
 
       mapObjects.push({ x: cabinX, y: cabinY, w: 60, h: 40, type: 'cabin', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
 
-      let gardenX = cabinX + 72;
+      let gardenX = cabinX + 64;
       let gardenY = cabinY;
-      if (gardenX + 48 > ox + SCREEN_SIZE) gardenX = cabinX - 48;
+      if (gardenX + 64 > ox + SCREEN_SIZE) gardenX = cabinX - 68;
 
-      mapObjects.push({ x: gardenX, y: gardenY, w: 48, h: 40, type: 'garden_soil', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot });
+      mapObjects.push({ x: gardenX, y: gardenY, w: 64, h: 48, type: 'garden_soil', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot });
       
-      if (!isSpaceOccupied(gardenX, gardenY, TILE, TILE)) {
-        mapObjects.push({ x: gardenX, y: gardenY, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
-      }
-      if (!isSpaceOccupied(gardenX + 24, gardenY, TILE, TILE)) {
-        mapObjects.push({ x: gardenX + 24, y: gardenY, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
+      for (let gx = 4; gx < 64; gx += 20) {
+        for (let gy = 4; gy < 48; gy += 20) {
+          if (!isSpaceOccupied(gardenX + gx, gardenY + gy, TILE, TILE)) {
+            mapObjects.push({ x: gardenX + gx, y: gardenY + gy, w: TILE, h: TILE, type: 'veggie', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot });
+          }
+        }
       }
 
-      let wolfZoneY = Math.floor(Math.random() * 3) * SCREEN_SIZE;
-      let wolfX = ox + 48 + Math.random() * 120;
-      let wolfY = wolfZoneY + 48 + Math.random() * 120;
-      enemies.push({ x: wolfX, y: wolfY, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot, bounceX: 0, bounceY: 0, hp: 1 });
+      // 4. Wild Wolf Enemies (2 per riverlot)
+      for (let eCount = 0; eCount < 2; eCount++) {
+        let isWoodSpawn = Math.random() < 0.7;
+        let wolfZoneY = isWoodSpawn ? 0 : Math.floor(Math.random() * 2 + 1) * SCREEN_SIZE;
+        let wolfX = ox + 36 + Math.random() * 120;
+        let wolfY = wolfZoneY + 36 + Math.random() * 120;
+        enemies.push({ x: wolfX, y: wolfY, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot, bounceX: 0, bounceY: 0, hp: 1 });
+      }
+    }
+
+    // --- LOT 2 (The Forks & Upper Fort Garry) ---
+    let fortOx = SCREEN_SIZE * 2;
+
+    // Upper Fort Garry 2x2 Building Grid in Zone 2 (Town Zone)
+    let fortBuildings = [
+      { x: fortOx + 24,  y: SCREEN_SIZE * 2 + 24, w: 50, h: 36, label: 'STORE' },
+      { x: fortOx + 100, y: SCREEN_SIZE * 2 + 24, w: 50, h: 36, label: 'FORT' },
+      { x: fortOx + 24,  y: SCREEN_SIZE * 2 + 120, w: 50, h: 36, label: 'HALL' },
+      { x: fortOx + 100, y: SCREEN_SIZE * 2 + 120, w: 50, h: 36, label: 'POST' }
+    ];
+
+    fortBuildings.forEach(b => {
+      mapObjects.push({ x: b.x, y: b.y, w: b.w, h: b.h, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: b.label });
+    });
+
+    // Zone 1: Tall Grass / Prairie Hazard Area in Upper Fort Garry
+    for (let bCount = 0; bCount < 6; bCount++) {
+      let bx = fortOx + 24 + (bCount % 3) * 48;
+      let by = SCREEN_SIZE + 36 + Math.floor(bCount / 3) * 48;
+      if (!isSpaceOccupied(bx, by, TILE, TILE)) {
+        mapObjects.push({ x: bx, y: by, w: TILE, h: TILE, type: 'bush', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
+      }
+    }
+
+    // Zone 0: Wooded Enemy Zone in Upper Fort Garry (Higher Wolf Density: 3 wolves)
+    for (let wTree = 0; wTree < 8; wTree++) {
+      let tx = fortOx + 24 + (wTree % 4) * 36;
+      let ty = 24 + Math.floor(wTree / 4) * 48;
+      if (!isSpaceOccupied(tx, ty, TILE, TILE)) {
+        mapObjects.push({ x: tx, y: ty, w: 16, h: 16, type: 'tree', solid: true, hitOffsetX: 4, hitOffsetY: 4, lot: 2 });
+      }
+    }
+
+    for (let wCount = 0; wCount < 3; wCount++) {
+      enemies.push({ x: fortOx + 36 + Math.random() * 100, y: 36 + Math.random() * 120, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot: 2, bounceX: 0, bounceY: 0, hp: 1 });
     }
   }
 
@@ -276,10 +328,8 @@
     else if (dirStr === 'DPAD_LEFT' || dirStr === 'left') { nextX -= TILE; player.dir = 'left'; }
     else if (dirStr === 'DPAD_RIGHT' || dirStr === 'right') { nextX += TILE; player.dir = 'right'; }
 
-    // World Bounds
     if (nextX < 0 || nextX + player.w > WORLD_WIDTH || nextY < 0 || nextY + player.h > WORLD_HEIGHT) return;
 
-    // Obstacle Collision Check
     let testBox = { x: nextX, y: nextY, w: player.w, h: player.h };
     for (let obj of mapObjects) {
       if (obj.solid && isColliding(testBox, obj)) return;
@@ -291,7 +341,6 @@
   }
 
   function stopTileMovement() {
-    // Halts player immediately upon input release if they've reached their target tile
     if (player.x === player.targetX && player.y === player.targetY) {
       player.moving = false;
     }
@@ -301,7 +350,6 @@
     if (state !== 'PLAYING') return;
     frame++;
 
-    // Tile Interpolation Logic
     if (player.moving) {
       let stepX = Math.sign(player.targetX - player.x) * player.speed;
       let stepY = Math.sign(player.targetY - player.y) * player.speed;
@@ -321,7 +369,6 @@
       player.animFrame = 0;
     }
 
-    // Camera Shift in 2D Grid
     if (isShifting) {
       if (camera.x < shiftTargetX) camera.x = Math.min(shiftTargetX, camera.x + 8);
       else if (camera.x > shiftTargetX) camera.x = Math.max(shiftTargetX, camera.x - 8);
@@ -343,19 +390,24 @@
         
         mapObjects.forEach(obj => {
            if (obj.type === 'cut_bush') {
-               obj.type = 'bush'; 
+               obj.type = (obj.prevType || 'bush'); 
                obj.solid = true; 
            }
         });
       }
     }
 
+    // Dynamic Title Display based on active zone
+    let activeCol = Math.floor(player.x / SCREEN_SIZE);
+    if (activeCol === 2) titleDisplay.innerText = "UPPER FORT GARRY";
+    else if (activeCol === 1) titleDisplay.innerText = "NEIGHBOR LOT";
+    else titleDisplay.innerText = "RIVERLOT";
+
     if (player.slashing) {
       player.slashTimer--;
       if (player.slashTimer <= 0) player.slashing = false;
     }
 
-    // Energy Replenishment
     let playerCol = Math.floor(player.x / SCREEN_SIZE);
     let playerRow = Math.floor(player.y / SCREEN_SIZE);
     if (playerCol === 0 && playerRow === 2 && frame % 60 === 0 && energy < MAX_ENERGY) {
@@ -363,7 +415,6 @@
       updateUI();
     }
 
-    // Loot Collection
     for(let i=drops.length-1; i>=0; i--) {
       let d = drops[i];
       if (isColliding(player, d)) {
@@ -373,7 +424,6 @@
       }
     }
 
-    // Enemies Logic & Bounce Mechanics
     for(let i=enemies.length-1; i>=0; i--) {
       let e = enemies[i];
 
@@ -443,10 +493,11 @@
     if (player.dir === 'right') hitbox.x += 16;
 
     for (let obj of mapObjects) {
-      if (obj.type === 'bush' && isColliding(hitbox, obj)) {
+      if ((obj.type === 'bush' || obj.type === 'veggie') && isColliding(hitbox, obj)) {
+        obj.prevType = obj.type;
         obj.type = 'cut_bush';
         obj.solid = false; 
-        if (Math.random() > 0.6) drops.push({ x: obj.x + 4, y: obj.y + 4, w: 16, h: 16 });
+        if (Math.random() > 0.4) drops.push({ x: obj.x + 4, y: obj.y + 4, w: 16, h: 16 });
       }
     }
 
@@ -485,9 +536,10 @@
              ctx.fillRect(xOff + gx, yOff + gy, 4, 4);
           }
         } else if (r === 2) {
-          ctx.fillStyle = C.DIRT;
+          ctx.fillStyle = (c === 2) ? '#5A6351' : C.DIRT; // Cobblestone/dirt town square in Upper Fort Garry
           ctx.fillRect(xOff, yOff, SCREEN_SIZE, SCREEN_SIZE);
         } else if (r === 3) {
+          // Shoreline Bank
           ctx.fillStyle = C.DIRT;
           ctx.fillRect(xOff, yOff, SCREEN_SIZE, 20); 
 
@@ -500,6 +552,7 @@
             ctx.fillRect(xOff + px, yOff + 28, 4, 4);
           }
 
+          // Red River Water
           ctx.fillStyle = C.WATER;
           ctx.fillRect(xOff, yOff + 32, SCREEN_SIZE, 208); 
           ctx.fillStyle = C.WATER_LIGHT;
@@ -509,11 +562,21 @@
       }
     }
 
+    // Draw Assiniboine River cutting vertically in Lot 2 (The Forks Confluence)
+    let assx = SCREEN_SIZE * 2 + 180;
+    ctx.fillStyle = C.WATER;
+    ctx.fillRect(assx, 0, 36, SCREEN_SIZE * 3 + 32);
+    ctx.fillStyle = C.WATER_LIGHT;
+    ctx.fillRect(assx + 10, (Date.now()/25)% (SCREEN_SIZE*3), 16, 4);
+
+    // Draw Map Objects
     for (let obj of mapObjects) {
       if (obj.type === 'tree') {
         drawSprite(obj.x, obj.y, sprTree, {1:C.LEAVES, 2:C.GRASS_LIGHT, 3:C.WOOD});
       } else if (obj.type === 'bush') {
         drawSprite(obj.x, obj.y, sprBush, {1:C.LEAVES, 2:C.GRASS_LIGHT});
+      } else if (obj.type === 'veggie') {
+        drawSprite(obj.x, obj.y, sprVeggie, {1:C.VEGGIE_GREEN, 2:C.VEGGIE_ORANGE});
       } else if (obj.type === 'cut_bush') {
         ctx.fillStyle = C.STUMP;
         ctx.fillRect(obj.x+8, obj.y+10, 8, 8);
@@ -521,11 +584,15 @@
         ctx.fillStyle = C.WOOD; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
         ctx.fillStyle = C.WOOD_LIGHT; ctx.fillRect(obj.x+4, obj.y+4, obj.w-8, obj.h-8);
         ctx.fillStyle = '#000'; ctx.fillRect(obj.x+24, obj.y+20, 12, 20); 
+      } else if (obj.type === 'fort_building') {
+        ctx.fillStyle = C.STONE; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x+2, obj.y+2, obj.w-4, 8);
+        ctx.fillStyle = '#000'; ctx.fillRect(obj.x+20, obj.y+18, 10, 18); // Door
       } else if (obj.type === 'garden_soil') {
         ctx.fillStyle = C.DIRT_DARK;
         ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
         ctx.fillStyle = C.DIRT;
-        for (let gy = 4; gy < obj.h; gy += 8) {
+        for (let gy = 4; gy < obj.h; gy += 10) {
           ctx.fillRect(obj.x, obj.y + gy, obj.w, 2);
         }
       }
