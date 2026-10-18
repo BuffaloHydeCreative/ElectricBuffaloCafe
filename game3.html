@@ -65,7 +65,7 @@
         const COLOR_NAMES = ['ERASER', 'RED BEAD', 'BLUE BEAD', 'YELLOW BEAD', 'WHITE BEAD'];
         
         // Master State Machine
-        let gameState = 'MODE_SELECT'; // MODE_SELECT, PUZZLE_START, PUZZLE_DIFFICULTY, PUZZLE_PLAYING, PUZZLE_CASCADING, PUZZLE_GAMEOVER, STUDIO_START, STUDIO_PLAYING
+        let gameState = 'MODE_SELECT'; 
         let currentMode = null; 
         let menuSelection = 0; // 0 = Puzzle, 1 = Studio
 
@@ -81,6 +81,99 @@
         // Studio Variables
         let studioBoard = [];
         let cursor = { x: 4, y: 5, color: 1 };
+
+        // ==========================================
+        // KOROBEINIKI × TEARDROP WALTZ AUDIO ENGINE
+        // ==========================================
+        let chiptuneAudioCtx = null;
+        let chiptuneInterval = null;
+        let chiptuneIsPlaying = false;
+        let currentStep = 0;
+
+        const songTitle = "Korobeiniki × Teardrop Waltz";
+        const BPM = 125; 
+        const noteLength = 60 / BPM / 4; // Fast 16th-note clock resolution
+
+        const NOTES = {};
+        NOTES['E3'] = 164.81; NOTES['G#3'] = 207.65; NOTES['A3'] = 220.00; NOTES['B3'] = 246.94; 
+        NOTES['C4'] = 261.63; NOTES['D4'] = 293.66; NOTES['E4'] = 329.63; NOTES['F4'] = 349.23;
+        NOTES['G#4'] = 415.30; NOTES['A4'] = 440.00; NOTES['B4'] = 493.88; NOTES['C5'] = 523.25; 
+        NOTES['D5'] = 587.33; NOTES['E5'] = 659.25; NOTES['F5'] = 698.46; NOTES['A5'] = 880.00;
+
+        var tetrisWaltzLead = [
+            'E5', null, 'B4', 'C5', 'D5', null, 'C5', 'B4',
+            'A4', null, 'A4', 'C5', 'E5', null, 'D5', 'C5',
+            'B4', null, 'B4', 'C5', 'D5', null, 'E5', null,
+            'C5', null, 'A4', null, 'A4', null, null, null
+        ];
+
+        var fiddleBass = [
+            'A3', null, 'E4', null, 'A3', null, 'E4', null,
+            'A3', null, 'E4', null, 'A3', null, 'E4', null,
+            'E3', null, 'G#4', null, 'E3', null, 'G#4', null,
+            'A3', null, 'E4', null, 'A3', 'E3', 'A3', null
+        ];
+
+        function initChiptuneAudio() {
+            if (!chiptuneAudioCtx) {
+                chiptuneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (chiptuneAudioCtx.state === 'suspended') {
+                chiptuneAudioCtx.resume();
+            }
+        }
+
+        function playTone(freq, type, duration, volume) {
+            if (!freq || !chiptuneAudioCtx) return;
+            const osc = chiptuneAudioCtx.createOscillator();
+            const gainNode = chiptuneAudioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, chiptuneAudioCtx.currentTime);
+            gainNode.gain.setValueAtTime(volume, chiptuneAudioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, chiptuneAudioCtx.currentTime + duration - 0.015);
+            osc.connect(gainNode);
+            gainNode.connect(chiptuneAudioCtx.destination);
+            osc.start();
+            osc.stop(chiptuneAudioCtx.currentTime + duration);
+        }
+
+        function sequenceTrack() {
+            var leadNote = tetrisWaltzLead[currentStep];
+            var bassNote = fiddleBass[currentStep];
+
+            // Track 1: Square Wave Lead
+            if (leadNote && NOTES[leadNote]) {
+                playTone(NOTES[leadNote], 'square', noteLength * 0.9, 0.04);
+            }
+
+            // Track 2: Triangle Bass
+            if (bassNote && NOTES[bassNote]) {
+                playTone(NOTES[bassNote], 'triangle', noteLength * 1.5, 0.25);
+            }
+
+            currentStep = (currentStep + 1) % 32;
+        }
+
+        function startChiptuneTrack() {
+            initChiptuneAudio();
+            if (!chiptuneIsPlaying) {
+                chiptuneIsPlaying = true;
+                currentStep = 0;
+                chiptuneInterval = setInterval(sequenceTrack, noteLength * 1000);
+            }
+        }
+
+        function stopChiptuneTrack() {
+            if (chiptuneIsPlaying) {
+                clearInterval(chiptuneInterval);
+                chiptuneIsPlaying = false;
+                currentStep = 0;
+            }
+        }
+
+        // Invisible event listeners to handle mobile Safari user-gesture requirements
+        document.addEventListener('touchstart', initChiptuneAudio, { once: true });
+        document.addEventListener('mousedown', initChiptuneAudio, { once: true });
 
         // ---------------------------------------------------------
         // SIGNAL BRIDGE
@@ -117,14 +210,23 @@
                     if (cmd === 'DPAD_UP' || cmd === 'DPAD_DOWN') {
                         puzzleDifficulty = puzzleDifficulty === 1 ? 2 : 1;
                     }
-                    if (cmd === 'BUTTON_A') startPuzzleGame();
+                    if (cmd === 'BUTTON_A') {
+                        startChiptuneTrack();
+                        startPuzzleGame();
+                    }
                     if (cmd === 'BUTTON_B') gameState = 'PUZZLE_START';
                     return;
                 }
 
                 if (gameState === 'PUZZLE_GAMEOVER') {
-                    if (cmd === 'BUTTON_A') startPuzzleGame();
-                    if (cmd === 'BUTTON_B') gameState = 'MODE_SELECT';
+                    if (cmd === 'BUTTON_A') {
+                        startChiptuneTrack();
+                        startPuzzleGame();
+                    }
+                    if (cmd === 'BUTTON_B') {
+                        stopChiptuneTrack();
+                        gameState = 'MODE_SELECT';
+                    }
                     return;
                 }
 
@@ -140,7 +242,10 @@
             // 3. STUDIO MODE CONTROLS
             if (currentMode === 'STUDIO') {
                 if (gameState === 'STUDIO_START') {
-                    if (cmd === 'BUTTON_A') startStudioGame();
+                    if (cmd === 'BUTTON_A') {
+                        startChiptuneTrack();
+                        startStudioGame();
+                    }
                     if (cmd === 'BUTTON_B') gameState = 'MODE_SELECT';
                     return;
                 }
@@ -181,7 +286,10 @@
             active.c1 = Math.floor(Math.random() * 3) + 1;
             active.c2 = active.isSingle ? 0 : Math.floor(Math.random() * 3) + 1;
 
-            if (!isValid(active.x, active.y, active.dir)) gameState = 'PUZZLE_GAMEOVER';
+            if (!isValid(active.x, active.y, active.dir)) {
+                stopChiptuneTrack();
+                gameState = 'PUZZLE_GAMEOVER';
+            }
         }
 
         function getC2Pos(x, y, dir) {
@@ -192,10 +300,8 @@
         }
 
         function isValid(x, y, dir) {
-            // Check bounds and collision for C1
             if (x < 0 || x >= COLS || y < 0 || y >= PUZZLE_ROWS || puzBoard[y][x] !== 0) return false;
             
-            // Check bounds and collision for C2 if playing Double Bead mode
             if (!active.isSingle) {
                 let p2 = getC2Pos(x, y, dir);
                 if (p2.x < 0 || p2.x >= COLS || p2.y < 0 || p2.y >= PUZZLE_ROWS || puzBoard[p2.y][p2.x] !== 0) return false;
@@ -214,7 +320,7 @@
         }
 
         function rotateActive(direction) {
-            if (active.isSingle) return; // No rotation needed for a single bead
+            if (active.isSingle) return; 
 
             let newDir = (active.dir + direction + 4) % 4;
             if (isValid(active.x, active.y, newDir)) active.dir = newDir;
