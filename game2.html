@@ -177,13 +177,13 @@
         let gameState = 'START';
         let score = 0, combo = 0, maxCombo = 0;
         let audioCtx = null, nextStepTime = 0.0, currentStep = 0, timerID;
-        let activeOscillators = []; // Array to track scheduled audio to prevent overlaps
+        let activeOscillators = []; 
         let expectedBeats = [], floatingTexts = [];
         let jiggerState = 'IDLE', jiggerTimer = 0, lastLeg = 'L';
         let currentTrackName = "";
         let melodyPattern = [];
 
-        // --- AUDIO INITIALIZATION (WITH SAFARI UNLOCK) ---
+        // --- AUDIO INITIALIZATION ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         
         function initAudio() {
@@ -198,7 +198,6 @@
             }
         }
 
-        // Invisible event listeners to handle mobile Safari user-gesture requirements
         document.addEventListener('touchstart', unlockAudio, { once: true });
         document.addEventListener('mousedown', unlockAudio, { once: true });
 
@@ -312,23 +311,30 @@
         // --- Arcade Cabinet Bridge ---
         window.addEventListener('message', function(event) {
             if (event.data === 'BUTTON_A') {
-                if (gameState === 'START' || gameState === 'GAME_OVER') {
+                if (gameState === 'START') {
                     startGame();
                 } else if (gameState === 'PLAYING') {
                     handleInput();
+                } else if (gameState === 'GAME_OVER') {
+                    returnToStart();
                 }
             } else if (event.data === 'BUTTON_B') {
-                if (gameState === 'PLAYING' || gameState === 'GAME_OVER') {
+                if (gameState === 'PLAYING') {
                     startGame();
                 }
             }
         });
 
+        function returnToStart() {
+            clearTimeout(timerID);
+            stopAllAudio();
+            gameState = 'START';
+        }
+
         function startGame() {
             initAudio();
             if(audioCtx.state === 'suspended') audioCtx.resume();
             
-            // Clear any previously scheduled audio and stop the scheduling loop before restarting
             clearTimeout(timerID); 
             stopAllAudio();
             
@@ -425,11 +431,7 @@
                 
                 ctx.fillStyle = '#12AEA2';
                 ctx.font = '14px "Press Start 2P"';
-                ctx.fillText("PRESS 'A' TO REPLAY", canvas.width/2, canvas.height/2 + 80);
-
-                ctx.fillStyle = '#FB6604';
-                ctx.font = '10px "Press Start 2P"';
-                ctx.fillText("PRESS 'B' FOR NEXT TRACK", canvas.width/2, canvas.height/2 + 110);
+                ctx.fillText("PRESS 'A' TO CONTINUE", canvas.width/2, canvas.height/2 + 80);
                 return;
             }
 
