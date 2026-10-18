@@ -83,35 +83,38 @@
         let cursor = { x: 4, y: 5, color: 1 };
 
         // ==========================================
-        // KOROBEINIKI × TEARDROP WALTZ AUDIO ENGINE
+        // MATRIARCH'S TEARDROP LAMENT AUDIO ENGINE
         // ==========================================
         let chiptuneAudioCtx = null;
         let chiptuneInterval = null;
         let chiptuneIsPlaying = false;
         let currentStep = 0;
 
-        const songTitle = "Korobeiniki × Teardrop Waltz";
-        const BPM = 125; 
-        const noteLength = 60 / BPM / 4; // Fast 16th-note clock resolution
+        const songTitle = "Matriarch's Teardrop Lament";
+        const BPM = 75; 
+        const noteLength = 60 / BPM / 2; // Slower 8th-note clock resolution for a sweeping, legato feel
 
         const NOTES = {};
-        NOTES['E3'] = 164.81; NOTES['G#3'] = 207.65; NOTES['A3'] = 220.00; NOTES['B3'] = 246.94; 
-        NOTES['C4'] = 261.63; NOTES['D4'] = 293.66; NOTES['E4'] = 329.63; NOTES['F4'] = 349.23;
-        NOTES['G#4'] = 415.30; NOTES['A4'] = 440.00; NOTES['B4'] = 493.88; NOTES['C5'] = 523.25; 
-        NOTES['D5'] = 587.33; NOTES['E5'] = 659.25; NOTES['F5'] = 698.46; NOTES['A5'] = 880.00;
+        NOTES['F#2'] = 92.50;  NOTES['G2'] = 98.00;   NOTES['A2'] = 110.00;  NOTES['B2'] = 123.47;
+        NOTES['D3'] = 146.83;  NOTES['E3'] = 164.81;  NOTES['F#3'] = 185.00; NOTES['A3'] = 220.00;
+        NOTES['B3'] = 246.94;  NOTES['C#4'] = 277.18; NOTES['D4'] = 293.66;  NOTES['E4'] = 329.63;
+        NOTES['F#4'] = 369.99; NOTES['A4'] = 440.00;  NOTES['B4'] = 493.88;  NOTES['C#5'] = 554.37;
+        NOTES['D5'] = 587.33;  NOTES['E5'] = 659.25;  NOTES['F#5'] = 739.99; NOTES['A5'] = 880.00;
 
-        var tetrisWaltzLead = [
-            'E5', null, 'B4', 'C5', 'D5', null, 'C5', 'B4',
-            'A4', null, 'A4', 'C5', 'E5', null, 'D5', 'C5',
-            'B4', null, 'B4', 'C5', 'D5', null, 'E5', null,
-            'C5', null, 'A4', null, 'A4', null, null, null
+        // A mournful, rolling fiddle air simulating a slow Celtic/Métis lament
+        var matriarchFiddle = [
+            'B4', 'C#5', 'D5', 'F#5', 'E5', 'D5', 'B4', null,
+            'A4', 'B4', 'D5', 'E5', 'F#5', null, 'A5', null,
+            'F#5', 'E5', 'D5', 'B4', 'A4', 'B4', 'D5', 'E5',
+            'F#5', 'D5', 'B4', 'A4', 'B4', null, null, null
         ];
 
-        var fiddleBass = [
-            'A3', null, 'E4', null, 'A3', null, 'E4', null,
-            'A3', null, 'E4', null, 'A3', null, 'E4', null,
-            'E3', null, 'G#4', null, 'E3', null, 'G#4', null,
-            'A3', null, 'E4', null, 'A3', 'E3', 'A3', null
+        // Deep, resonant cello/acoustic drone providing a melancholy emotional anchor
+        var celloDrone = [
+            'B2', null, null, null, 'B2', null, null, null,
+            'A2', null, null, null, 'A2', null, null, null,
+            'G2', null, null, null, 'G2', null, null, null,
+            'F#2', null, null, null, 'B2', null, null, null
         ];
 
         function initChiptuneAudio() {
@@ -138,17 +141,17 @@
         }
 
         function sequenceTrack() {
-            var leadNote = tetrisWaltzLead[currentStep];
-            var bassNote = fiddleBass[currentStep];
+            var leadNote = matriarchFiddle[currentStep];
+            var bassNote = celloDrone[currentStep];
 
-            // Track 1: Square Wave Lead
+            // Track 1: Soft Square Wave (Simulating a gently bowed fiddle with legato phrasing)
             if (leadNote && NOTES[leadNote]) {
-                playTone(NOTES[leadNote], 'square', noteLength * 0.9, 0.04);
+                playTone(NOTES[leadNote], 'square', noteLength * 1.2, 0.02);
             }
 
-            // Track 2: Triangle Bass
+            // Track 2: Sustained Sine Wave (Deep, mournful acoustic bass drone)
             if (bassNote && NOTES[bassNote]) {
-                playTone(NOTES[bassNote], 'triangle', noteLength * 1.5, 0.25);
+                playTone(NOTES[bassNote], 'sine', noteLength * 3.8, 0.15);
             }
 
             currentStep = (currentStep + 1) % 32;
