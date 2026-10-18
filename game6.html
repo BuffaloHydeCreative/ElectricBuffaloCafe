@@ -77,6 +77,108 @@
   </div>
 </div>
 
+// ==========================================
+// TRIFORCE JIG CHIPTUNE AUDIO ENGINE
+// ==========================================
+
+let chiptuneAudioCtx = null;
+let chiptuneInterval = null;
+let chiptuneIsPlaying = false;
+let currentChiptuneStep = 0;
+
+// Tempo Configuration (145 BPM - Step-Dance Reel/Jig)
+const CHIPTUNE_BPM = 145;
+const CHIPTUNE_NOTE_LEN = 60 / CHIPTUNE_BPM / 2; // Eighth note duration
+
+// Note Frequencies (A-Mixolydian Scale)
+const CHIPTUNE_NOTES = {
+    'A3': 220.00, 'B3': 246.94, 'C#4': 277.18, 'D4': 293.66, 'E4': 329.63, 'F#4': 369.99, 'G4': 392.00,
+    'A4': 440.00, 'B4': 493.88, 'C#5': 554.37, 'D5': 587.33, 'E5': 659.25, 'F#5': 739.99, 'G5': 783.99, 'A5': 880.00
+};
+
+// 32-Step Pattern Data
+const leadPattern = [
+    // High Section - The Overworld Reel
+    'A5', 'E5', 'A5', 'A5', 'B5', 'C#5', 'D5', 'E5', 
+    'F#5', 'F#5', 'F#5', 'E5', 'D5', 'E5', 'C#5', 'A4',
+    // Low Section - The Lost Woods Fancy Footwork Drop
+    'A4', 'C#4', 'E4', 'A4', 'G4', 'E4', 'G4', 'B4',
+    'A4', 'C#4', 'E4', 'A4', 'E5', 'D5', 'B4', 'G4'
+];
+
+const bassPattern = [
+    'A3', 'A4', 'E4', 'A4', 'A3', 'A4', 'E4', 'A4',
+    'A3', 'A4', 'F#4', 'A4', 'A3', 'G4', 'E4', 'G4',
+    'A3', null, 'A3', 'A4', 'G3', null, 'G3', 'B3',
+    'A3', null, 'A3', 'A4', 'E4', 'D4', 'B3', 'G3'
+];
+
+// Audio Context Setup with Mobile Safari Unlock Support
+function initChiptuneAudio() {
+    if (!chiptuneAudioCtx) {
+        chiptuneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (chiptuneAudioCtx.state === 'suspended') {
+        chiptuneAudioCtx.resume();
+    }
+}
+
+// Low-level synthesizer tone generator
+function playChiptuneTone(freq, type, duration, volume) {
+    if (!freq || !chiptuneAudioCtx) return;
+
+    const osc = chiptuneAudioCtx.createOscillator();
+    const gainNode = chiptuneAudioCtx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, chiptuneAudioCtx.currentTime);
+
+    gainNode.gain.setValueAtTime(volume, chiptuneAudioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, chiptuneAudioCtx.currentTime + duration - 0.015);
+
+    osc.connect(gainNode);
+    gainNode.connect(chiptuneAudioCtx.destination);
+
+    osc.start();
+    osc.stop(chiptuneAudioCtx.currentTime + duration);
+}
+
+// Sequencer Step Engine
+function stepChiptuneTrack() {
+    const leadNote = leadPattern[currentChiptuneStep];
+    const bassNote = bassPattern[currentChiptuneStep];
+
+    // Lead Track: Square Wave (Fiddle Simulation)
+    if (leadNote && CHIPTUNE_NOTES[leadNote]) {
+        playChiptuneTone(CHIPTUNE_NOTES[leadNote], 'square', CHIPTUNE_NOTE_LEN, 0.04);
+    }
+    
+    // Bass Track: Triangle Wave (Foot-tapping / Low drone)
+    if (bassNote && CHIPTUNE_NOTES[bassNote]) {
+        playChiptuneTone(CHIPTUNE_NOTES[bassNote], 'triangle', CHIPTUNE_NOTE_LEN * 1.2, 0.15);
+    }
+
+    currentChiptuneStep = (currentChiptuneStep + 1) % 32;
+}
+
+// Public Methods to Control Music
+function startChiptuneTrack() {
+    initChiptuneAudio();
+    if (!chiptuneIsPlaying) {
+        chiptuneIsPlaying = true;
+        currentChiptuneStep = 0;
+        chiptuneInterval = setInterval(stepChiptuneTrack, CHIPTUNE_NOTE_LEN * 1000);
+    }
+}
+
+function stopChiptuneTrack() {
+    if (chiptuneIsPlaying) {
+        clearInterval(chiptuneInterval);
+        chiptuneIsPlaying = false;
+        currentChiptuneStep = 0;
+    }
+}
+  
 <script>
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
