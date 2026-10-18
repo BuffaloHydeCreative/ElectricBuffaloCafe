@@ -76,15 +76,18 @@
     
     <div id="intro-screen" class="overlay">
       <h2>Red River Run</h2>
-      <p>Navigate the treacherous currents from The Forks of Upper Fort Garry, through the rocky shores of Lake Winnipeg, and into the frozen winter trails.<br><br>Move UP/DOWN to dodge dangerous rocks, driftwood & debris and whirlpools!</p>
+      <p>Navigate the treacherous currents from the Red River valley, through the rocky shores of Lake Winnipeg, and into the frozen winter trails.<br><br>Use the D-PAD to dodge bright white debris and whirlpools!</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
     
-    <div id="msg">YOU CRASHED!<br><br>PRESS 'A' TO RESTART</div>
+    <div id="msg">CRASHED!<br><br>PRESS 'A' TO RESTART</div>
   </div>
 </div>
 
 <script>
+  // ==========================================
+  // GAME ENGINE & VISUALS
+  // ==========================================
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
   const msg = document.getElementById('msg');
@@ -213,11 +216,11 @@
 
   function drawFort(x, y, sil) {
     ctx.fillStyle = sil ? C_BASE : C_STONE;
-    ctx.fillRect(x, y, 20, 10); // Wall
-    ctx.fillRect(x+8, y-4, 4, 14); // Small tower
+    ctx.fillRect(x, y, 20, 10); 
+    ctx.fillRect(x+8, y-4, 4, 14); 
     if(!sil) {
       ctx.fillStyle = C_BASE;
-      ctx.fillRect(x+9, y+4, 2, 6); // gate
+      ctx.fillRect(x+9, y+4, 2, 6); 
     }
   }
 
@@ -236,7 +239,6 @@
   }
 
   function drawScene() {
-    // --- Determine Colors Based on Score Gradients ---
     let skyCol = C_ACC3, gndCol = C_SEC, watCol = C_ACC1, foamCol = C_ACC3;
     let levelTitle = "RED RIVER RUN";
     
@@ -251,27 +253,27 @@
       watCol = lerpColor(C_ACC1, C_LAKE, t);
       foamCol = lerpColor(C_ACC3, C_FOAM, t);
     } else if (score < 750) {
-      levelTitle = "St. Peters";
+      levelTitle = "LAKE WINNIPEG MOUTH";
       let t = (score - 500) / 250;
       gndCol = lerpColor(C_ACC2, '#284A41', t);
       watCol = C_LAKE;
       foamCol = C_FOAM;
     } else if (score < 1000) {
-      levelTitle = "LAKE WINNIPEG";
+      levelTitle = "MID-LAKE WINNIPEG";
       let t = (score - 750) / 250;
       skyCol = lerpColor(C_ACC3, C_NIGHT, t);
       gndCol = lerpColor('#284A41', C_BASE, t);
       watCol = lerpColor(C_LAKE, C_INDIGO, t);
       foamCol = C_FOAM;
     } else if (score < 1250) {
-      levelTitle = "Northern Boreal Forest";
+      levelTitle = "MIDNIGHT LAKE";
       let t = (score - 1000) / 250;
       skyCol = lerpColor(C_NIGHT, C_ACC3, t);
       gndCol = lerpColor(C_BASE, C_SNOW, t);
       watCol = lerpColor(C_INDIGO, C_ACC3, t);
       foamCol = lerpColor(C_FOAM, C_SNOW, t);
     } else {
-      levelTitle = "Hudson Bay";
+      levelTitle = "BOREAL WINTER TRAIL";
       skyCol = C_ACC3; gndCol = C_SNOW; watCol = C_ACC3; foamCol = C_SNOW;
     }
 
@@ -281,11 +283,10 @@
     ctx.fillStyle = skyCol;
     ctx.fillRect(0, 0, 160, 80);
 
-    // 2. Dynamic Parallax Ground
+    // 2. Parallax Ground
     ctx.fillStyle = gndCol;
     ctx.fillRect(0, 20, 160, 16);
     
-    // Grass/Texture detailing
     let grassOffset = (bgOffset * 0.3) % 40;
     if (score < 1250) {
       ctx.fillStyle = (score > 750 && score < 1250) ? C_ACC3 : C_BASE;
@@ -316,13 +317,11 @@
       }
     }
 
-    // Static Landmarks (appearing based on absolute virtual distance)
+    // Static Landmarks
     let absoluteVirtualX = (bgOffset * 0.4);
-    // Upper Fort Garry at the start
     if (absoluteVirtualX < 200) {
       drawFort(100 - absoluteVirtualX, 15, false);
     }
-    // Lower Fort Garry near score 400 (roughly when absoluteVirtualX is around 1200-1400)
     if (absoluteVirtualX > 1100 && absoluteVirtualX < 1400) {
       drawFort(1300 - absoluteVirtualX, 15, false);
     }
@@ -434,7 +433,74 @@
     }, 800);
   }
 
+  // ==========================================
+  // CHIPTUNE AUDIO ENGINE
+  // ==========================================
+  let audioCtx = null;
+  let audioTimer = null;
+  let currentStepAudio = 0;
+  const AUDIO_BPM = 132; 
+  const noteLength = 60 / AUDIO_BPM / 4; 
+
+  const NOTES = {
+    'E3': 164.81, 'F#3': 185.00, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94, 'D4': 293.66,
+    'E4': 329.63, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88, 'D5': 587.33,
+    'E5': 659.25, 'F#5': 739.99, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77, 'D6': 1174.66
+  };
+
+  const wilyLead = [
+    'E4', 'E5', 'B4', 'E5', 'D5', 'B4', 'D5', 'E5',
+    'G4', 'G5', 'D5', 'G5', 'F#5', 'D5', 'F#5', 'G5',
+    'A4', 'A5', 'E5', 'A5', 'G5', 'E5', 'G5', 'A5',
+    'B5', 'A5', 'G5', 'F#5', 'E5', 'D5', 'B4', 'D5'
+  ];
+
+  const powWowDrum = [
+    'E3', 'E3', null, 'E3', 'E3', 'E3', null, 'E3',
+    'G3', 'G3', null, 'G3', 'G3', 'G3', null, 'G3',
+    'A3', 'A3', null, 'A3', 'A3', 'A3', null, 'A3',
+    'B3', null, 'B3', null, 'D4', 'B3', 'G3', 'F#3'
+  ];
+
+  function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  function playTone(freq, type, duration, volume) {
+    if (!freq || !audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration - 0.015);
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  }
+
+  function sequenceTrack() {
+    let leadNote = wilyLead[currentStepAudio];
+    let bassNote = powWowDrum[currentStepAudio];
+
+    if (leadNote && NOTES[leadNote]) {
+        playTone(NOTES[leadNote], 'square', noteLength * 0.95, 0.03);
+    }
+    if (bassNote && NOTES[bassNote]) {
+        playTone(NOTES[bassNote], 'triangle', noteLength * 2.2, 0.25);
+    }
+    
+    currentStepAudio = (currentStepAudio + 1) % 32;
+  }
+
+  // ==========================================
+  // GAME STATE MANAGEMENT
+  // ==========================================
   function startGame() {
+    initAudio(); // Unlocks Web Audio on interaction
+    
     isPlaying = true;
     isGameOver = false;
     isSpinning = false;
@@ -443,8 +509,15 @@
     bgOffset = 0;
     obstacles = [];
     playerLane = 1;
+    
     introScreen.style.display = 'none';
     msg.style.display = 'none';
+    
+    if (!audioTimer) {
+      currentStepAudio = 0;
+      audioTimer = setInterval(sequenceTrack, noteLength * 1000);
+    }
+
     update();
   }
 
@@ -452,6 +525,11 @@
     isPlaying = false;
     isGameOver = true;
     msg.style.display = 'block';
+    
+    if (audioTimer) {
+      clearInterval(audioTimer);
+      audioTimer = null;
+    }
   }
 
   // Arcade Cabinet UI postMessage Listener
