@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Bonami!</title>
+<title>Riverlot Adventure - Upper Fort Garry</title>
 <style>
   body {
     margin: 0; padding: 0;
@@ -58,7 +58,7 @@
   <div id="header">
     <div class="header-row">
       <span id="title-display">RIVERLOT</span>
-      <span id="score-display">GOODS: 0</span>
+      <span id="score-display">GOODS: 0 | SCORE: 0</span>
     </div>
     <div class="header-row">
       <span>ENERGY</span>
@@ -70,8 +70,8 @@
     <canvas id="gameCanvas" width="240" height="240"></canvas>
     
     <div id="intro-screen" class="overlay">
-      <h2>Riverlot & The Forks</h2>
-      <p>Explore riverlots, Upper Fort Garry & St. Boniface.<br>Cross the Assiniboine River using the ferry boat.<br>Harvest garden veggies & hay (-1 Energy).<br>Rest at the Homestead cabin to recharge.</p>
+      <h2>Riverlot & Upper Fort</h2>
+      <p>Explore your lot, neighbor's land & Upper Fort Garry.<br>Cross the river via ferry boat to reach the Fort.<br>Harvest crops (-1 Energy) & trade goods at the Fort Gate!<br>Rest at the Homestead cabin to recharge.</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
   </div>
@@ -88,7 +88,7 @@
   const TILE = 24; 
   const SCREEN_SIZE = 240; 
   const WORLD_COLS = 4; // Lot 0 (Player), Lot 1 (Neighbor), Lot 2 (Upper Fort Garry), Lot 3 (Saint Boniface)
-  const WORLD_ROWS = 4; // Woods, Hay Privilege, Homestead/Town, Scenic River
+  const WORLD_ROWS = 4; // Woods, Hay Privilege, Homestead/Fort, Scenic River
   const WORLD_WIDTH = SCREEN_SIZE * WORLD_COLS;
   const WORLD_HEIGHT = SCREEN_SIZE * WORLD_ROWS; 
   const FPS = 60; 
@@ -114,10 +114,12 @@
     WOLF_FUR: '#6C757D',
     WOLF_EYE: '#AD1C21',
     STONE: '#6A6B6E',
+    STONE_DARK: '#4A4B4E',
     STONE_ROOF: '#3A3B3D'
   };
 
   let state = 'START'; 
+  let score = 0;
   let inventory = 0;
   let energy = 100;
   const MAX_ENERGY = 100;
@@ -210,7 +212,7 @@
     // Red River Water Barrier across full bottom of world (Zone 3)
     mapObjects.push({ x: 0, y: (SCREEN_SIZE * 3) + 30, w: WORLD_WIDTH, h: 210, type: 'water_barrier', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: -1 });
 
-    // Vertical Assiniboine River Water Barrier (Doubled width to 72px, cutting through Lots 2 & 3)
+    // Vertical Assiniboine River Water Barrier (Doubled width to 72px)
     let assx = SCREEN_SIZE * 2 + 160;
     
     // Top segment of Assiniboine River (above ferry crossing)
@@ -281,12 +283,18 @@
       }
     }
 
-    // --- LOT 2 (Upper Fort Garry - West Bank Village) ---
+    // --- LOT 2 (Upper Fort Garry - Iconic Fort Structure) ---
     let fortOx = SCREEN_SIZE * 2;
     
-    // 2-House Simplified Village in Upper Fort Garry (Lot 2 Zone 2)
-    mapObjects.push({ x: fortOx + 24,  y: SCREEN_SIZE * 2 + 36, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'STORE' });
-    mapObjects.push({ x: fortOx + 24,  y: SCREEN_SIZE * 2 + 130, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'FORT' });
+    // Large Upper Fort Garry Compound with Iconic Arch Gate (Lot 2 Zone 2)
+    // Left Fort Wall/Tower
+    mapObjects.push({ x: fortOx + 12, y: SCREEN_SIZE * 2 + 36, w: 48, h: 140, type: 'fort_wall', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
+    // Right Fort Wall/Tower
+    mapObjects.push({ x: fortOx + 96, y: SCREEN_SIZE * 2 + 36, w: 48, h: 140, type: 'fort_wall', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
+    // Upper Archway Gate Roof (Solid barrier over gate top)
+    mapObjects.push({ x: fortOx + 60, y: SCREEN_SIZE * 2 + 36, w: 36, h: 36, type: 'fort_gate_top', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
+    // Interactive Trading Gate Spot (Walk-up trading zone inside gate archway)
+    mapObjects.push({ x: fortOx + 60, y: SCREEN_SIZE * 2 + 72, w: 36, h: 36, type: 'fort_trade_gate', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
 
     // Zone 1 & 0 in Upper Fort Garry
     for (let bCount = 0; bCount < 4; bCount++) {
@@ -311,7 +319,6 @@
     // --- LOT 3 (Saint Boniface - East Bank Village) ---
     let bonOx = SCREEN_SIZE * 3;
 
-    // 2-House Simplified Village in Saint Boniface (Lot 3 Zone 2)
     mapObjects.push({ x: bonOx + 80, y: SCREEN_SIZE * 2 + 36, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3, label: 'HALL' });
     mapObjects.push({ x: bonOx + 80, y: SCREEN_SIZE * 2 + 130, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3, label: 'POST' });
 
@@ -496,6 +503,20 @@
 
   function doAction() {
     if (state !== 'PLAYING' || isShifting || player.slashing) return;
+
+    // Trade Goods for Score at Upper Fort Garry Gate
+    let activeCol = Math.floor(player.x / SCREEN_SIZE);
+    let activeRow = Math.floor(player.y / SCREEN_SIZE);
+    if (activeCol === 2 && activeRow === 2 && inventory > 0) {
+      let fortGate = mapObjects.find(o => o.type === 'fort_trade_gate');
+      if (fortGate && isColliding(player, fortGate)) {
+        score += inventory * 100;
+        inventory = 0;
+        updateUI();
+        return;
+      }
+    }
+
     if (energy <= 0) return; 
 
     energy--;
@@ -606,14 +627,26 @@
         ctx.fillStyle = C.STONE; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
         ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x+2, obj.y+2, obj.w-4, 8);
         ctx.fillStyle = '#000'; ctx.fillRect(obj.x+22, obj.y+18, 10, 18); 
+      } else if (obj.type === 'fort_wall') {
+        // Upper Fort Garry Stone Wall & Corner Tower
+        ctx.fillStyle = C.STONE; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        ctx.fillStyle = C.STONE_DARK; ctx.fillRect(obj.x + 2, obj.y + 2, obj.w - 4, 16);
+        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x, obj.y, obj.w, 8);
+      } else if (obj.type === 'fort_gate_top') {
+        // Iconic Upper Fort Garry Arch Gate Top Roof
+        ctx.fillStyle = C.STONE_DARK; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x - 4, obj.y - 4, obj.w + 8, 12);
+      } else if (obj.type === 'fort_trade_gate') {
+        // Archway Opening Entrance Floor
+        ctx.fillStyle = C.DIRT; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        ctx.fillStyle = C.GOLD; ctx.fillRect(obj.x + 12, obj.y + 12, 12, 12); // Trading Post Emblem
       } else if (obj.type === 'ferry') {
-        // Crossable Wooden Ferry Boat
         ctx.fillStyle = C.WOOD;
         ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
         ctx.fillStyle = C.WOOD_LIGHT;
         ctx.fillRect(obj.x + 4, obj.y + 4, obj.w - 8, obj.h - 8);
         ctx.fillStyle = C.DIRT;
-        ctx.fillRect(obj.x, obj.y + 18, obj.w, 12); // Plank deck walkway
+        ctx.fillRect(obj.x, obj.y + 18, obj.w, 12);
       } else if (obj.type === 'garden_soil') {
         ctx.fillStyle = C.DIRT_DARK;
         ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
@@ -651,12 +684,13 @@
   }
 
   function updateUI() {
-    scoreDisplay.innerText = `GOODS: ${inventory}`;
+    scoreDisplay.innerText = `GOODS: ${inventory} | SCORE: ${score}`;
     energyFill.style.width = Math.min(100, Math.max(0, (energy/MAX_ENERGY)*100)) + '%';
   }
 
   function startGame() {
     state = 'PLAYING';
+    score = 0;
     inventory = 0;
     energy = 100;
     generateMap();
