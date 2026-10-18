@@ -71,13 +71,99 @@
     
     <div id="intro-screen" class="overlay">
       <h2>Riverlot & Upper Fort</h2>
-      <p>Explore your lot, neighbor's land, St. Boniface & Upper Fort.<br>Cross the river via ferry boat to reach the Fort Gate.<br>Stand at the Fort Gate to trade goods for score!<br>Rest at the Homestead cabin to recharge.</p>
+      <p>Explore your lot, neighbor's land, The Forks & Upper Fort.<br>Cross the Assiniboine River via stepping stones!<br>Stand at the Fort Gate to trade goods for score!<br>Rest at the Homestead cabin to recharge.</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
   </div>
 </div>
 
 <script>
+  // ==========================================
+  // TRIFORCE JIG CHIPTUNE AUDIO ENGINE
+  // ==========================================
+  let chiptuneAudioCtx = null;
+  let chiptuneInterval = null;
+  let chiptuneIsPlaying = false;
+  let currentChiptuneStep = 0;
+
+  const CHIPTUNE_BPM = 145;
+  const CHIPTUNE_NOTE_LEN = 60 / CHIPTUNE_BPM / 2;
+
+  const CHIPTUNE_NOTES = {
+      'A3': 220.00, 'B3': 246.94, 'C#4': 277.18, 'D4': 293.66, 'E4': 329.63, 'F#4': 369.99, 'G4': 392.00,
+      'A4': 440.00, 'B4': 493.88, 'C#5': 554.37, 'D5': 587.33, 'E5': 659.25, 'F#5': 739.99, 'G5': 783.99, 'A5': 880.00
+  };
+
+  const leadPattern = [
+      'A5', 'E5', 'A5', 'A5', 'B5', 'C#5', 'D5', 'E5', 
+      'F#5', 'F#5', 'F#5', 'E5', 'D5', 'E5', 'C#5', 'A4',
+      'A4', 'C#4', 'E4', 'A4', 'G4', 'E4', 'G4', 'B4',
+      'A4', 'C#4', 'E4', 'A4', 'E5', 'D5', 'B4', 'G4'
+  ];
+
+  const bassPattern = [
+      'A3', 'A4', 'E4', 'A4', 'A3', 'A4', 'E4', 'A4',
+      'A3', 'A4', 'F#4', 'A4', 'A3', 'G4', 'E4', 'G4',
+      'A3', null, 'A3', 'A4', 'G3', null, 'G3', 'B3',
+      'A3', null, 'A3', 'A4', 'E4', 'D4', 'B3', 'G3'
+  ];
+
+  function initChiptuneAudio() {
+      if (!chiptuneAudioCtx) {
+          chiptuneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (chiptuneAudioCtx.state === 'suspended') {
+          chiptuneAudioCtx.resume();
+      }
+  }
+
+  function playChiptuneTone(freq, type, duration, volume) {
+      if (!freq || !chiptuneAudioCtx) return;
+      const osc = chiptuneAudioCtx.createOscillator();
+      const gainNode = chiptuneAudioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, chiptuneAudioCtx.currentTime);
+      gainNode.gain.setValueAtTime(volume, chiptuneAudioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, chiptuneAudioCtx.currentTime + duration - 0.015);
+      osc.connect(gainNode);
+      gainNode.connect(chiptuneAudioCtx.destination);
+      osc.start();
+      osc.stop(chiptuneAudioCtx.currentTime + duration);
+  }
+
+  function stepChiptuneTrack() {
+      const leadNote = leadPattern[currentChiptuneStep];
+      const bassNote = bassPattern[currentChiptuneStep];
+
+      if (leadNote && CHIPTUNE_NOTES[leadNote]) {
+          playChiptuneTone(CHIPTUNE_NOTES[leadNote], 'square', CHIPTUNE_NOTE_LEN, 0.04);
+      }
+      if (bassNote && CHIPTUNE_NOTES[bassNote]) {
+          playChiptuneTone(CHIPTUNE_NOTES[bassNote], 'triangle', CHIPTUNE_NOTE_LEN * 1.2, 0.15);
+      }
+      currentChiptuneStep = (currentChiptuneStep + 1) % 32;
+  }
+
+  function startChiptuneTrack() {
+      initChiptuneAudio();
+      if (!chiptuneIsPlaying) {
+          chiptuneIsPlaying = true;
+          currentChiptuneStep = 0;
+          chiptuneInterval = setInterval(stepChiptuneTrack, CHIPTUNE_NOTE_LEN * 1000);
+      }
+  }
+
+  function stopChiptuneTrack() {
+      if (chiptuneIsPlaying) {
+          clearInterval(chiptuneInterval);
+          chiptuneIsPlaying = false;
+          currentChiptuneStep = 0;
+      }
+  }
+
+  // ==========================================
+  // GAME ENGINE & 4x4 OVERWORLD SETUP
+  // ==========================================
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
   const introScreen = document.getElementById('intro-screen');
@@ -87,11 +173,10 @@
   
   const TILE = 24; 
   const SCREEN_SIZE = 240; 
-  const WORLD_COLS = 4; // Lot 0 (Home), Lot 1 (Neighbor), Lot 2 (Forks & St. Boniface), Lot 3 (Upper Fort Garry)
-  const WORLD_ROWS = 4; // Woods, Hay Privilege, Homestead/Fort, Scenic River
+  const WORLD_COLS = 4; // Lot 0: User Home, Lot 1: Neighbour, Lot 2: The Forks, Lot 3: Upper Fort Garry
+  const WORLD_ROWS = 4; // Zone 0: Woods, Zone 1: Hay Priv., Zone 2: Homestead/Fort, Zone 3: Riverbank
   const WORLD_WIDTH = SCREEN_SIZE * WORLD_COLS;
   const WORLD_HEIGHT = SCREEN_SIZE * WORLD_ROWS; 
-  const FPS = 60; 
   
   const C = {
     GRASS: '#387C44',
@@ -143,7 +228,7 @@
   let mapObjects = [];
   let drops = [];
   let enemies = [];
-  let sparkles = []; // Sparkle particle feedback for trade conversions
+  let sparkles = [];
 
   const drawSprite = (x, y, matrix, paletteMap) => {
     const s = TILE / 8; 
@@ -210,20 +295,26 @@
     mapObjects = [];
     enemies = [];
 
-    // Red River Water Barrier across full bottom of world (Zone 3)
+    // Red River Water Barrier across full bottom of world (Zone 3: Riverbank)
     mapObjects.push({ x: 0, y: (SCREEN_SIZE * 3) + 30, w: WORLD_WIDTH, h: 210, type: 'water_barrier', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: -1 });
 
-    // Vertical Assiniboine River in Lot 2 (Forks Lot)
-    let assx = SCREEN_SIZE * 1 + 180; // Positions river inside the Forks lot
-    mapObjects.push({ x: assx, y: 0, w: 60, h: SCREEN_SIZE * 2 + 80, type: 'assiniboine_river', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 1 });
-    mapObjects.push({ x: assx - 4, y: SCREEN_SIZE * 2 + 80, w: 68, h: 48, type: 'ferry', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot: 1 });
-    mapObjects.push({ x: assx, y: SCREEN_SIZE * 2 + 128, w: 60, h: SCREEN_SIZE + 30, type: 'assiniboine_river', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 1 });
+    // Vertical Assiniboine River running entirely through Lot 2 (Forks Lot across all 4 zones)
+    let assx = SCREEN_SIZE * 2 + 180;
+    
+    // Top segment (Zone 0 & 1)
+    mapObjects.push({ x: assx, y: 0, w: 60, h: SCREEN_SIZE * 2 + 80, type: 'assiniboine_river', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
+    
+    // Stepping Stones Crossing in Zone 2
+    mapObjects.push({ x: assx + 10, y: SCREEN_SIZE * 2 + 88, w: 40, h: 40, type: 'stepping_stones', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
+    
+    // Bottom segment (Zone 2 bottom to Zone 3)
+    mapObjects.push({ x: assx, y: SCREEN_SIZE * 2 + 128, w: 60, h: SCREEN_SIZE * 2, type: 'assiniboine_river', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
 
-    // --- LOT 0 & 1 (Player & Neighbor Riverlots) ---
+    // --- LOT 0 & 1 (User Home Lot & Neighbour Lot) ---
     for (let lot = 0; lot < 2; lot++) {
       let ox = lot * SCREEN_SIZE;
 
-      // Zone 0: Deep Woodlands
+      // Zone 0: Woods
       let trees = 0, attempts = 0;
       while (trees < 10 && attempts < 100) {
         let x = ox + Math.floor(Math.random() * (SCREEN_SIZE / TILE - 2) + 1) * TILE;
@@ -247,7 +338,7 @@
         attempts++;
       }
 
-      // Zone 2: Homestead & Garden
+      // Zone 2: Homestead
       let cabinX = ox + 24 + Math.floor(Math.random() * 2) * 48;
       let cabinY = (SCREEN_SIZE * 2) + 36 + Math.floor(Math.random() * 2) * 48;
       if (lot === 0 && Math.hypot(cabinX - 96, cabinY - (camera.y + 96)) < 48) cabinX = ox + 24;
@@ -268,7 +359,7 @@
         }
       }
 
-      // Wild Wolf Enemies (2 per riverlot)
+      // Enemies
       for (let eCount = 0; eCount < 2; eCount++) {
         let isWoodSpawn = Math.random() < 0.7;
         let wolfZoneY = isWoodSpawn ? 0 : Math.floor(Math.random() * 2 + 1) * SCREEN_SIZE;
@@ -278,7 +369,7 @@
       }
     }
 
-    // --- LOT 2 (The Forks & St. Boniface Village) ---
+    // --- LOT 2 (The Forks & St. Boniface) ---
     let forksOx = SCREEN_SIZE * 2;
     mapObjects.push({ x: forksOx + 24, y: SCREEN_SIZE * 2 + 36, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'HALL' });
     mapObjects.push({ x: forksOx + 24, y: SCREEN_SIZE * 2 + 130, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'POST' });
@@ -292,16 +383,21 @@
     }
     enemies.push({ x: forksOx + 48, y: 48, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot: 2, bounceX: 0, bounceY: 0, hp: 1 });
 
-    // --- LOT 3 (Upper Fort Garry - Lot 4) ---
+    // --- LOT 3 (Upper Fort Garry - SMB 1-Level Tall End Castle) ---
     let fortOx = SCREEN_SIZE * 3;
-    
-    // Slightly smaller Upper Fort Garry compound
-    mapObjects.push({ x: fortOx + 12, y: SCREEN_SIZE * 2 + 36, w: 40, h: 120, type: 'fort_wall', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
-    mapObjects.push({ x: fortOx + 84, y: SCREEN_SIZE * 2 + 36, w: 40, h: 120, type: 'fort_wall', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
-    mapObjects.push({ x: fortOx + 52, y: SCREEN_SIZE * 2 + 36, w: 32, h: 32, type: 'fort_gate_top', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
-    
-    // Interactive Trade Gate (Walk up to convert goods to score)
-    mapObjects.push({ x: fortOx + 52, y: SCREEN_SIZE * 2 + 68, w: 32, h: 32, type: 'fort_trade_gate', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
+    let castleX = fortOx + 40;
+    let castleY = SCREEN_SIZE * 1 + 60; // Spans across Zone 1 & 2
+
+    // Main Castle Keep Base
+    mapObjects.push({ x: castleX, y: castleY, w: 160, h: 140, type: 'fort_keep', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
+    // Left Turret
+    mapObjects.push({ x: castleX - 16, y: castleY - 20, w: 32, h: 160, type: 'fort_turret', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
+    // Right Turret
+    mapObjects.push({ x: castleX + 144, y: castleY - 20, w: 32, h: 160, type: 'fort_turret', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
+    // Gate Wall Center Structure
+    mapObjects.push({ x: castleX + 60, y: castleY + 60, w: 40, h: 40, type: 'fort_gate_top', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
+    // Castle Entry Gate
+    mapObjects.push({ x: castleX + 60, y: castleY + 100, w: 40, h: 40, type: 'fort_trade_gate', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
 
     for (let wTree = 0; wTree < 6; wTree++) {
       let tx = fortOx + 24 + (wTree % 3) * 36;
@@ -412,29 +508,26 @@
       }
     }
 
-    // Dynamic Title Display
     let activeCol = Math.floor(player.x / SCREEN_SIZE);
-    if (activeCol === 3) titleDisplay.innerText = "UPPER FORT GARRY";
-    else if (activeCol === 2) titleDisplay.innerText = "ST. BONIFACE & FORKS";
-    else if (activeCol === 1) titleDisplay.innerText = "NEIGHBOR LOT";
-    else titleDisplay.innerText = "HOME RIVERLOT";
+    let activeRow = Math.floor(player.y / SCREEN_SIZE);
+    
+    const zoneNames = ["WOODS", "HAY PRIVILEGE", "HOMESTEAD", "RIVERBANK"];
+    const lotNames = ["HOME LOT", "NEIGHBOUR LOT", "THE FORKS", "UPPER FORT GARRY"];
+    titleDisplay.innerText = `${lotNames[activeCol]} - ${zoneNames[activeRow]}`;
 
     if (player.slashing) {
       player.slashTimer--;
       if (player.slashTimer <= 0) player.slashing = false;
     }
 
-    let playerCol = Math.floor(player.x / SCREEN_SIZE);
-    let playerRow = Math.floor(player.y / SCREEN_SIZE);
-
-    // Homestead Energy Recovery (1 energy/sec in Lot 0 Zone 2)
-    if (playerCol === 0 && playerRow === 2 && frame % 60 === 0 && energy < MAX_ENERGY) {
+    // Homestead Energy Recovery (Lot 0, Zone 2)
+    if (activeCol === 0 && activeRow === 2 && frame % 60 === 0 && energy < MAX_ENERGY) {
       energy++;
       updateUI();
     }
 
-    // Fort Gate Trade Conversion Mechanic (1 good -> 100 Score every 1 sec)
-    if (playerCol === 3 && playerRow === 2 && inventory > 0) {
+    // Fort Gate Trade Conversion Mechanic
+    if (activeCol === 3 && inventory > 0) {
       let fortGate = mapObjects.find(o => o.type === 'fort_trade_gate');
       if (fortGate && isColliding(player, fortGate)) {
         if (frame % 60 === 0) {
@@ -446,7 +539,6 @@
       }
     }
 
-    // Update Sparkle Particles
     for (let i = sparkles.length - 1; i >= 0; i--) {
       let sp = sparkles[i];
       sp.life--;
@@ -499,7 +591,7 @@
       let minX = e.lot * SCREEN_SIZE;
       let maxX = minX + SCREEN_SIZE - e.w;
       if (e.x < minX || e.x > maxX) { e.dx *= -1; e.x += e.dx; }
-      if (e.y < 0 || e.y > SCREEN_SIZE * 3 + 10) { e.dy *= -1; e.y += e.dy; }
+      if (e.y < 0 || e.y > WORLD_HEIGHT - e.h) { e.dy *= -1; e.y += e.dy; }
 
       if (isColliding(player, e) && !isShifting) {
         energy = Math.max(0, energy - 10);
@@ -565,7 +657,7 @@
       for (let r = 0; r < WORLD_ROWS; r++) {
         let yOff = r * SCREEN_SIZE;
         
-        if (r === 0 || r === 1) {
+        if (r === 0 || r === 1) { // Woods & Hay Privilege
           ctx.fillStyle = C.GRASS;
           ctx.fillRect(xOff, yOff, SCREEN_SIZE, SCREEN_SIZE);
           ctx.fillStyle = C.GRASS_LIGHT;
@@ -574,10 +666,10 @@
              let gy = (c*23 + r*19 + g*47) % SCREEN_SIZE;
              ctx.fillRect(xOff + gx, yOff + gy, 4, 4);
           }
-        } else if (r === 2) {
-          ctx.fillStyle = (c >= 2) ? '#5A6351' : C.DIRT; // Cobblestone town square in Fort Garry & St. Boniface
+        } else if (r === 2) { // Homestead & Fort Grounds
+          ctx.fillStyle = (c >= 2) ? '#5A6351' : C.DIRT; 
           ctx.fillRect(xOff, yOff, SCREEN_SIZE, SCREEN_SIZE);
-        } else if (r === 3) {
+        } else if (r === 3) { // Riverbank & Red River
           ctx.fillStyle = C.DIRT;
           ctx.fillRect(xOff, yOff, SCREEN_SIZE, 20); 
 
@@ -599,14 +691,13 @@
       }
     }
 
-    // Draw Vertical Assiniboine River in Lot 2
-    let assx = SCREEN_SIZE * 1 + 180;
+    // Assiniboine River (Vertical across all 4 zones in Lot 2)
+    let assx = SCREEN_SIZE * 2 + 180;
     ctx.fillStyle = C.WATER;
-    ctx.fillRect(assx, 0, 60, SCREEN_SIZE * 3 + 32);
+    ctx.fillRect(assx, 0, 60, WORLD_HEIGHT);
     ctx.fillStyle = C.WATER_LIGHT;
-    ctx.fillRect(assx + 10, (Date.now()/25)% (SCREEN_SIZE*3), 16, 4);
+    ctx.fillRect(assx + 10, (Date.now()/25)% WORLD_HEIGHT, 16, 4);
 
-    // Draw Map Objects
     for (let obj of mapObjects) {
       if (obj.type === 'tree') {
         drawSprite(obj.x, obj.y, sprTree, {1:C.LEAVES, 2:C.GRASS_LIGHT, 3:C.WOOD});
@@ -625,20 +716,25 @@
         ctx.fillStyle = C.STONE; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
         ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x+2, obj.y+2, obj.w-4, 8);
         ctx.fillStyle = '#000'; ctx.fillRect(obj.x+22, obj.y+18, 10, 18); 
-      } else if (obj.type === 'fort_wall') {
+      } else if (obj.type === 'fort_keep') { // SMB End Castle Style
         ctx.fillStyle = C.STONE; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.STONE_DARK; ctx.fillRect(obj.x + 2, obj.y + 2, obj.w - 4, 16);
-        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x, obj.y, obj.w, 8);
+        ctx.fillStyle = C.STONE_DARK;
+        for (let bx = 0; bx < obj.w; bx += 20) {
+          ctx.fillRect(obj.x + bx, obj.y, 10, 12);
+        }
+      } else if (obj.type === 'fort_turret') {
+        ctx.fillStyle = C.STONE_DARK; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x - 4, obj.y - 6, obj.w + 8, 12);
       } else if (obj.type === 'fort_gate_top') {
         ctx.fillStyle = C.STONE_DARK; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
         ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x - 4, obj.y - 4, obj.w + 8, 10);
       } else if (obj.type === 'fort_trade_gate') {
         ctx.fillStyle = C.DIRT; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.GOLD; ctx.fillRect(obj.x + 10, obj.y + 10, 12, 12); 
-      } else if (obj.type === 'ferry') {
-        ctx.fillStyle = C.WOOD; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.WOOD_LIGHT; ctx.fillRect(obj.x + 4, obj.y + 4, obj.w - 8, obj.h - 8);
-        ctx.fillStyle = C.DIRT; ctx.fillRect(obj.x, obj.y + 18, obj.w, 12);
+        ctx.fillStyle = C.GOLD; ctx.fillRect(obj.x + 14, obj.y + 14, 12, 12); 
+      } else if (obj.type === 'stepping_stones') {
+        ctx.fillStyle = C.STONE;
+        ctx.fillRect(obj.x + 4, obj.y + 4, 14, 12);
+        ctx.fillRect(obj.x + 22, obj.y + 20, 14, 12);
       } else if (obj.type === 'garden_soil') {
         ctx.fillStyle = C.DIRT_DARK; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
         ctx.fillStyle = C.DIRT;
@@ -654,7 +750,6 @@
       drawSprite(e.x, e.y, sprWolf, {1:'#000', 2:C.WOLF_FUR, 3:C.WOLF_EYE});
     }
 
-    // Draw Sparkle Particles
     for (let sp of sparkles) {
       ctx.fillStyle = sp.color;
       ctx.fillRect(sp.x, sp.y, sp.size, sp.size);
@@ -690,6 +785,7 @@
     score = 0;
     inventory = 0;
     energy = 100;
+    startChiptuneTrack();
     generateMap();
     updateUI();
     introScreen.style.display = 'none';
@@ -700,6 +796,8 @@
     if (cmd === 'BUTTON_A') {
       if (state === 'START') startGame();
       else doAction();
+    } else if (cmd === 'HOME') {
+      stopChiptuneTrack();
     }
     if (cmd === 'DPAD_UP' || cmd === 'DPAD_DOWN' || cmd === 'DPAD_LEFT' || cmd === 'DPAD_RIGHT') {
       moveTile(cmd);
@@ -724,6 +822,9 @@
       stopTileMovement();
     }
   });
+
+  document.addEventListener('touchstart', () => { initChiptuneAudio(); }, { once: true });
+  document.addEventListener('click', () => { initChiptuneAudio(); }, { once: true });
 
   loop();
 </script>
