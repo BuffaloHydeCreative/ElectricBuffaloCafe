@@ -73,6 +73,116 @@
 </div>
 
 <script>
+  // ==========================================
+  // GOURMET BLOSSOM EXPRESS AUDIO ENGINE
+  // ==========================================
+  let chiptuneAudioCtx = null;
+  let chiptuneInterval = null;
+  let chiptuneIsPlaying = false;
+  let currentChiptuneStep = 0;
+
+  const songTitle = "Gourmet Blossom Express";
+  const CHIPTUNE_BPM = 165; 
+  const CHIPTUNE_NOTE_LEN = 60 / CHIPTUNE_BPM / 4; // Fast 16th-note clock resolution
+
+  // High-energy G-Major/Blues crossover scale
+  const CHIPTUNE_NOTES = {
+    'G2': 98.00,  'C3': 130.81,  'D3': 146.83,  'E3': 164.81,
+    'G3': 196.00, 'A3': 220.00,  'A#3': 233.08, 'B3': 246.94,
+    'D4': 293.66, 'E4': 329.63,  'G4': 392.00,  'A4': 440.00,
+    'A#4': 466.16, 'B4': 493.88, 'D5': 587.33,  'E5': 659.25,
+    'G5': 783.99, 'A5': 880.00
+  };
+
+  // High-speed, hyperactive lead mimicking leaping platformer runs and screeching fiddle train whistles
+  const trainFiddleLead = [
+    'G5', 'E5', 'D5', 'B4', 'G4', 'B4', 'D5', 'E5',
+    'G5', 'G5', 'E5', 'E5', 'D5', 'D5', 'B4', 'G4',
+    'A4', 'A#4', 'B4', 'D5', 'E5', 'G5', 'A5', 'G5',
+    'E5', 'D5', 'B4', 'A#4', 'A4', 'E4', 'D4', 'E4'
+  ];
+
+  // Relentless, driving alternating bassline to simulate the heavy chug and rumble of a racing steam locomotive
+  const runawayTrainBass = [
+    'G2', 'D3', 'G2', 'D3', 'G2', 'E3', 'G2', 'D3',
+    'G2', 'D3', 'G2', 'D3', 'G2', 'E3', 'G2', 'D3',
+    'C3', 'G3', 'C3', 'G3', 'C3', 'A3', 'C3', 'G3',
+    'D3', 'A3', 'D3', 'A3', 'D3', 'B3', 'D3', 'A3'
+  ];
+
+  // Audio Context Setup with Mobile Safari Unlock Support[cite: 1, 2]
+  function initChiptuneAudio() {
+    if (!chiptuneAudioCtx) {
+        chiptuneAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (chiptuneAudioCtx.state === 'suspended') {
+        chiptuneAudioCtx.resume();
+    }
+  }
+
+  // Low-level synthesizer tone generator[cite: 5, 8]
+  function playChiptuneTone(freq, type, duration, volume) {
+    if (!freq || !chiptuneAudioCtx) return;
+
+    const osc = chiptuneAudioCtx.createOscillator();
+    const gainNode = chiptuneAudioCtx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, chiptuneAudioCtx.currentTime);
+
+    gainNode.gain.setValueAtTime(volume, chiptuneAudioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, chiptuneAudioCtx.currentTime + duration - 0.015);
+
+    osc.connect(gainNode);
+    gainNode.connect(chiptuneAudioCtx.destination);
+
+    osc.start();
+    osc.stop(chiptuneAudioCtx.currentTime + duration);
+  }
+
+  // Sequencer Step Engine
+  function stepChiptuneTrack() {
+    const leadNote = trainFiddleLead[currentChiptuneStep];
+    const bassNote = runawayTrainBass[currentChiptuneStep];
+
+    // Track 1: Square Wave Lead (Frantic, bright fiddle and whistle simulation)
+    if (leadNote && CHIPTUNE_NOTES[leadNote]) {
+        playChiptuneTone(CHIPTUNE_NOTES[leadNote], 'square', CHIPTUNE_NOTE_LEN * 0.85, 0.06);
+    }
+    
+    // Track 2: Triangle Bass (Driving low-end locomotive chug)
+    if (bassNote && CHIPTUNE_NOTES[bassNote]) {
+        playChiptuneTone(CHIPTUNE_NOTES[bassNote], 'triangle', CHIPTUNE_NOTE_LEN * 1.8, 0.35);
+    }
+
+    currentChiptuneStep = (currentChiptuneStep + 1) % 32;
+  }
+
+  // Public Methods to Control Music[cite: 5]
+  function startChiptuneTrack() {
+    initChiptuneAudio();
+    if (!chiptuneIsPlaying) {
+        chiptuneIsPlaying = true;
+        currentChiptuneStep = 0;
+        chiptuneInterval = setInterval(stepChiptuneTrack, CHIPTUNE_NOTE_LEN * 1000);
+    }
+  }
+
+  function stopChiptuneTrack() {
+    if (chiptuneIsPlaying) {
+        clearInterval(chiptuneInterval);
+        chiptuneIsPlaying = false;
+        currentChiptuneStep = 0;
+    }
+  }
+
+  // Safari initial touch/click policy fulfillment[cite: 5, 6]
+  document.addEventListener('touchstart', initChiptuneAudio, { once: true });
+  document.addEventListener('click', initChiptuneAudio, { once: true });
+
+  // ==========================================
+  // LAND THUNDER GAME ENGINE
+  // ==========================================
   const cvs = document.getElementById('gameCanvas');
   const ctx = cvs.getContext('2d');
   const introScreen = document.getElementById('intro-screen');
@@ -115,7 +225,7 @@
     }
   };
 
-  // 2-frame animation for galloping horse[cite: 1, 2]
+  // 2-frame animation for galloping horse
   const sprPlayerAnim = [
     [ // Frame 1: Legs Extended
       [0,0,0,1,1,1,0,0],
@@ -170,7 +280,6 @@
     if (frame % spawnRate === 0) {
       let bIdx = (level - 1) % BIOMES.length;
       
-      // Dynamic density weighting based on biome
       let pool = [];
       if (BIOMES[bIdx].type === 'mountain') pool = ['rock','rock','rock','shrub','fox'];
       else if (BIOMES[bIdx].type === 'desert') pool = ['rock','rock','shrub','shrub','fox'];
@@ -260,6 +369,7 @@
           } else {
             state = 'GAMEOVER';
             msgScreen.style.display = 'flex';
+            stopChiptuneTrack(); // Halt track on crash
           }
         }
 
@@ -310,7 +420,6 @@
       drawSprite(obs.x, obs.y, spr, pal, obs.scale);
     });
 
-    // Player Animation: Toggle frames based on game frame rate[cite: 1, 2]
     if (state !== 'GAMEOVER' || frame % 10 < 5) { 
       let animFrame = (Math.floor(frame / 8) % 2 === 0) ? sprPlayerAnim[0] : sprPlayerAnim[1];
       drawSprite(player.x, player.y, animFrame, {1:'#000', 2:'#D4D0C5', 3:'#0F6F9E', 4:'#5D4037'}, 4);
@@ -340,14 +449,19 @@
     if (ny >= 0 && ny <= cvs.height - player.h) player.y = ny;
   }
 
+  // Universal Gamepad Listener
   window.addEventListener('message', function(event) {
     const cmd = event.data;
     if (cmd === 'BUTTON_A') {
       if (state === 'START' || state === 'GAMEOVER') {
-        if (state === 'GAMEOVER') level = 1;
+        if (state === 'GAMEOVER') {
+            level = 1;
+            stopChiptuneTrack();
+        }
         initLevel(true); 
         introScreen.style.display = 'none';
         msgScreen.style.display = 'none';
+        startChiptuneTrack(); // Start background track
       }
     }
     if (cmd === 'DPAD_UP') move(0, -1);
@@ -356,6 +470,7 @@
     if (cmd === 'DPAD_RIGHT') move(1, 0);
   });
 
+  // Keyboard Fallback
   window.addEventListener('keydown', (e) => {
     if(e.key === 'ArrowUp') move(0, -1);
     if(e.key === 'ArrowDown') move(0, 1);
