@@ -173,7 +173,7 @@
   
   const TILE = 24; 
   const SCREEN_SIZE = 240; 
-  const WORLD_COLS = 4; // Lot 0: User Home, Lot 1: Neighbour, Lot 2: The Forks, Lot 3: Upper Fort Garry
+  const WORLD_COLS = 4; // Lot 0: Home, Lot 1: Neighbour, Lot 2: The Forks, Lot 3: Upper Fort Garry
   const WORLD_ROWS = 4; // Zone 0: Woods, Zone 1: Hay Priv., Zone 2: Homestead/Fort, Zone 3: Riverbank
   const WORLD_WIDTH = SCREEN_SIZE * WORLD_COLS;
   const WORLD_HEIGHT = SCREEN_SIZE * WORLD_ROWS; 
@@ -295,11 +295,11 @@
     mapObjects = [];
     enemies = [];
 
-    // Red River Water Barrier across full bottom of world (Zone 3: Riverbank)
+    // Red River Water Barrier across full bottom of world (Zone 3)
     mapObjects.push({ x: 0, y: (SCREEN_SIZE * 3) + 30, w: WORLD_WIDTH, h: 210, type: 'water_barrier', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: -1 });
 
-    // Vertical Assiniboine River running entirely through Lot 2 (Forks Lot across all 4 zones)
-    let assx = SCREEN_SIZE * 2 + 180;
+    // Vertical Assiniboine River CENTERED in Lot 2 (Lot 2 spans x: 480 to 720, center is x: 570)
+    let assx = SCREEN_SIZE * 2 + 90; // x: 570, width: 60 (spans 570 to 630, perfectly in the lot center)
     
     // Top segment (Zone 0 & 1)
     mapObjects.push({ x: assx, y: 0, w: 60, h: SCREEN_SIZE * 2 + 80, type: 'assiniboine_river', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2 });
@@ -371,8 +371,8 @@
 
     // --- LOT 2 (The Forks & St. Boniface) ---
     let forksOx = SCREEN_SIZE * 2;
-    mapObjects.push({ x: forksOx + 24, y: SCREEN_SIZE * 2 + 36, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'HALL' });
-    mapObjects.push({ x: forksOx + 24, y: SCREEN_SIZE * 2 + 130, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'POST' });
+    mapObjects.push({ x: forksOx + 12, y: SCREEN_SIZE * 2 + 36, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'HALL' });
+    mapObjects.push({ x: forksOx + 12, y: SCREEN_SIZE * 2 + 130, w: 54, h: 36, type: 'fort_building', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 2, label: 'POST' });
 
     for (let wTree = 0; wTree < 6; wTree++) {
       let tx = forksOx + 24 + (wTree % 2) * 48;
@@ -383,25 +383,23 @@
     }
     enemies.push({ x: forksOx + 48, y: 48, w: 16, h: 16, dx: 1, dy: 1, changeTimer: 60, lot: 2, bounceX: 0, bounceY: 0, hp: 1 });
 
-    // --- LOT 3 (Upper Fort Garry - SMB 1-Level Tall End Castle) ---
+    // --- LOT 3 (Upper Fort Garry - Resized & Compacted directly into Homestead Zone 2) ---
     let fortOx = SCREEN_SIZE * 3;
-    let castleX = fortOx + 40;
-    let castleY = SCREEN_SIZE * 1 + 60; // Spans across Zone 1 & 2
+    let fortBaseX = fortOx + 64;
+    let fortBaseY = (SCREEN_SIZE * 2) + 40;
 
-    // Main Castle Keep Base
-    mapObjects.push({ x: castleX, y: castleY, w: 160, h: 140, type: 'fort_keep', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
-    // Left Turret
-    mapObjects.push({ x: castleX - 16, y: castleY - 20, w: 32, h: 160, type: 'fort_turret', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
-    // Right Turret
-    mapObjects.push({ x: castleX + 144, y: castleY - 20, w: 32, h: 160, type: 'fort_turret', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
-    // Gate Wall Center Structure
-    mapObjects.push({ x: castleX + 60, y: castleY + 60, w: 40, h: 40, type: 'fort_gate_top', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
-    // Castle Entry Gate
-    mapObjects.push({ x: castleX + 60, y: castleY + 100, w: 40, h: 40, type: 'fort_trade_gate', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
+    // Compact Fort Outer Walls
+    mapObjects.push({ x: fortBaseX, y: fortBaseY, w: 24, h: 80, type: 'fort_wall', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
+    mapObjects.push({ x: fortBaseX + 88, y: fortBaseY, w: 24, h: 80, type: 'fort_wall', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
+    // Upper Arch Gate
+    mapObjects.push({ x: fortBaseX + 24, y: fortBaseY, w: 64, h: 24, type: 'fort_gate_top', solid: true, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
+    // Active Trade Gate Entrance
+    mapObjects.push({ x: fortBaseX + 40, y: fortBaseY + 24, w: 32, h: 32, type: 'fort_trade_gate', solid: false, hitOffsetX: 0, hitOffsetY: 0, lot: 3 });
 
-    for (let wTree = 0; wTree < 6; wTree++) {
-      let tx = fortOx + 24 + (wTree % 3) * 36;
-      let ty = 24 + Math.floor(wTree / 3) * 48;
+    // Trees in Woods (Zone 0) & Hay Priv. (Zone 1) for Lot 3
+    for (let wTree = 0; wTree < 8; wTree++) {
+      let tx = fortOx + 24 + (wTree % 4) * 48;
+      let ty = 24 + Math.floor(wTree / 4) * 60;
       if (!isSpaceOccupied(tx, ty, TILE, TILE)) {
         mapObjects.push({ x: tx, y: ty, w: 16, h: 16, type: 'tree', solid: true, hitOffsetX: 4, hitOffsetY: 4, lot: 3 });
       }
@@ -691,8 +689,8 @@
       }
     }
 
-    // Assiniboine River (Vertical across all 4 zones in Lot 2)
-    let assx = SCREEN_SIZE * 2 + 180;
+    // Assiniboine River (Centered in Lot 2 across all 4 zones)
+    let assx = SCREEN_SIZE * 2 + 90;
     ctx.fillStyle = C.WATER;
     ctx.fillRect(assx, 0, 60, WORLD_HEIGHT);
     ctx.fillStyle = C.WATER_LIGHT;
@@ -716,21 +714,16 @@
         ctx.fillStyle = C.STONE; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
         ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x+2, obj.y+2, obj.w-4, 8);
         ctx.fillStyle = '#000'; ctx.fillRect(obj.x+22, obj.y+18, 10, 18); 
-      } else if (obj.type === 'fort_keep') { // SMB End Castle Style
+      } else if (obj.type === 'fort_wall') {
         ctx.fillStyle = C.STONE; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.STONE_DARK;
-        for (let bx = 0; bx < obj.w; bx += 20) {
-          ctx.fillRect(obj.x + bx, obj.y, 10, 12);
-        }
-      } else if (obj.type === 'fort_turret') {
-        ctx.fillStyle = C.STONE_DARK; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x - 4, obj.y - 6, obj.w + 8, 12);
+        ctx.fillStyle = C.STONE_DARK; ctx.fillRect(obj.x + 2, obj.y + 2, obj.w - 4, 12);
+        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x, obj.y, obj.w, 6);
       } else if (obj.type === 'fort_gate_top') {
         ctx.fillStyle = C.STONE_DARK; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x - 4, obj.y - 4, obj.w + 8, 10);
+        ctx.fillStyle = C.STONE_ROOF; ctx.fillRect(obj.x - 2, obj.y - 2, obj.w + 4, 6);
       } else if (obj.type === 'fort_trade_gate') {
         ctx.fillStyle = C.DIRT; ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-        ctx.fillStyle = C.GOLD; ctx.fillRect(obj.x + 14, obj.y + 14, 12, 12); 
+        ctx.fillStyle = C.GOLD; ctx.fillRect(obj.x + 10, obj.y + 10, 12, 12); 
       } else if (obj.type === 'stepping_stones') {
         ctx.fillStyle = C.STONE;
         ctx.fillRect(obj.x + 4, obj.y + 4, 14, 12);
