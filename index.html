@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Bwaa Brule</title>
+  <title>Electric Buffalo Cafe</title>
   <style>
     /* Global Reset & Base */
     body { 
@@ -34,7 +34,7 @@
       box-sizing: border-box;
     }
 
-    /* --- SECTION 1: CRT MONITOR (Dynamic Flex Height) --- */
+    /* --- SECTION 1: CRT MONITOR --- */
     .monitor-bezel {
       flex: 1;
       min-height: 250px; 
@@ -59,25 +59,22 @@
       box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
     }
 
-    /* Screen States */
     .screen-layer {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
       box-sizing: border-box;
-      display: none; /* Hidden by default, JS controls visibility */
+      display: none; 
     }
 
-    /* State 1: Boot Splash */
     #boot-splash {
       background: #000;
       z-index: 15;
-      display: flex; /* Visible on load */
+      display: flex; 
       justify-content: center;
       align-items: center;
       flex-direction: column;
     }
 
-    /* Boot Splash Canvas Styling */
     #introCanvas {
       width: 100%;
       height: 100%;
@@ -86,30 +83,25 @@
       z-index: 2;
     }
 
-    /* State 2: Static Splash */
     #static-splash {
       background: #000;
-      color: #00A3A4;
       z-index: 14;
       justify-content: center;
       align-items: center;
-      text-align: center;
+      flex-direction: column;
     }
 
-    .blink-text {
-      font-size: 18px;
-      font-weight: bold;
-      animation: blinker 1.2s linear infinite;
+    #bwaaCanvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated; 
+      z-index: 2;
     }
 
-    @keyframes blinker {
-      50% { opacity: 0; }
-    }
-
-    /* State 3: The DOS Style Menu Overlay */
     #dos-menu {
       background: #000;
-      color: #00A3A4;
+      color: #12AEA2;
       padding: 20px;
       flex-direction: column;
       z-index: 10;
@@ -118,7 +110,7 @@
     .dos-header {
       font-weight: bold;
       margin-bottom: 15px;
-      border-bottom: 2px dashed #00A3A4;
+      border-bottom: 2px dashed #12AEA2;
       padding-bottom: 5px;
     }
 
@@ -140,7 +132,7 @@
     .dos-list li.active {
       opacity: 1;
       font-weight: bold;
-      background: #00A3A4;
+      background: #12AEA2;
       color: #000;
     }
 
@@ -153,7 +145,6 @@
       content: "> ";
     }
 
-    /* State 4: Game iFrame */
     #arcade-frame {
       width: 100%;
       height: 100%;
@@ -161,7 +152,6 @@
       z-index: 5;
     }
 
-    /* CRT Scanline Overlay */
     .crt-screen::after {
       content: " ";
       display: block;
@@ -174,7 +164,7 @@
       box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
     }
 
-    /* --- SECTION 2: CONTROL DECK (Fixed Height) --- */
+    /* --- SECTION 2: CONTROL DECK --- */
     .control-deck {
       flex: 0 0 160px;
       background: linear-gradient(to bottom, #2b2b2b 0%, #1a1a1a 15%, #111 100%);
@@ -190,7 +180,6 @@
       box-sizing: border-box;
     }
 
-    /* Analog-Style Drag Joystick */
     .joystick-base {
       width: 120px;
       height: 120px;
@@ -224,7 +213,6 @@
       transition: none; 
     }
 
-    /* Concave Action Buttons */
     .action-container {
       display: flex;
       gap: 15px;
@@ -263,8 +251,8 @@
       box-shadow: inset 0 6px 12px rgba(255,255,255,0.15), inset 0 -8px 15px rgba(0,0,0,0.7), 0 0 0 #050505, 0 4px 6px rgba(0,0,0,0.6);
     }
 
-    .btn-b { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #D63333; margin-top: 25px; }
-    .btn-a { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #00A3A4; }
+    .btn-b { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #AD1C21; margin-top: 25px; }
+    .btn-a { background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.4) 0%, transparent 80%), #12AEA2; }
 
     .btn-label {
       font-size: 12px;
@@ -272,7 +260,7 @@
       color: #777;
     }
 
-    /* --- SECTION 3: FRONT PANEL (Fixed Height) --- */
+    /* --- SECTION 3: FRONT PANEL --- */
     .front-panel {
       flex: 0 0 90px;
       background: linear-gradient(to bottom, #050505 0%, #111 100%);
@@ -283,7 +271,6 @@
       z-index: 4; 
     }
 
-    /* Subtle Home/Start Button */
     .home-container {
       display: flex;
       flex-direction: column;
@@ -319,24 +306,19 @@
 <body>
 
   <div class="arcade-machine">
-    
-    <!-- 1. CRT MONITOR -->
     <div class="monitor-bezel">
       <div class="crt-screen">
         
-        <!-- State 1: Animated Boot Up -->
         <div id="boot-splash" class="screen-layer">
           <canvas id="introCanvas" width="600" height="450"></canvas>
         </div>
 
-        <!-- State 2: Static Press Start -->
         <div id="static-splash" class="screen-layer">
-          <div class="blink-text">PRESS A TO START</div>
+          <canvas id="bwaaCanvas" width="600" height="450"></canvas>
         </div>
 
-        <!-- State 3: OS Menu -->
         <div id="dos-menu" class="screen-layer">
-          <div class="dos-header">Bwaa_Brule.EXE<br>RAM OK...</div>
+          <div class="dos-header">ElectricBuffalo.EXE<br>RAM OK...</div>
           <ul class="dos-list" id="game-list">
             <li class="active">Red River Run.html</li>
             <li>La Grande Gigue.html</li>
@@ -348,21 +330,15 @@
           </ul>
         </div>
 
-        <!-- State 4: Game Player -->
         <iframe id="arcade-frame" class="screen-layer" title="Game Screen"></iframe>
 
       </div>
     </div>
 
-    <!-- 2. CONTROL DECK -->
     <div class="control-deck">
-      
-      <!-- Drag/Swipe Joystick -->
       <div class="joystick-base" id="joystick-base">
         <div class="joystick-stick" id="joystick-stick"></div>
       </div>
-
-      <!-- Action Buttons -->
       <div class="action-container">
         <div class="action-btn-wrapper">
           <div class="action-btn btn-b" onmousedown="btnAction('BUTTON_B')" ontouchstart="preventGhostClick(event, 'BUTTON_B')"></div>
@@ -375,21 +351,16 @@
       </div>
     </div>
 
-    <!-- 3. FRONT PANEL -->
     <div class="front-panel">
-      <!-- Subtle Home/Start Button -->
       <div class="home-container">
         <div class="home-btn" onmousedown="btnHome()" ontouchstart="preventGhostClick(event, 'HOME')"></div>
         <span class="home-label">HOME</span>
       </div>
     </div>
-
   </div>
 
   <script>
-    // System State Tracker (BOOT -> STATIC -> MENU -> PLAYING)
     let machineState = 'BOOT';
-    
     let currentIndex = 0;
     const games = [
       'game1.html', 'game2.html', 'game3.html', 
@@ -397,31 +368,30 @@
     ];
     let isPlaying = false;
 
-    // DOM Elements
     const bootSplash = document.getElementById('boot-splash');
     const staticSplash = document.getElementById('static-splash');
     const dosMenu = document.getElementById('dos-menu');
     const gameFrame = document.getElementById('arcade-frame');
     const listItems = document.querySelectorAll('#game-list li');
 
+    let staticStartTime = 0;
+
     function transitionToStatic() {
       machineState = 'STATIC';
       bootSplash.style.display = 'none';
       staticSplash.style.display = 'flex';
+      staticStartTime = performance.now();
+      requestAnimationFrame(staticLoop);
     }
 
     function sendSignal(command) {
-      if (isPlaying) {
-        gameFrame.contentWindow.postMessage(command, '*');
-      }
+      if (isPlaying) gameFrame.contentWindow.postMessage(command, '*');
     }
 
-    // Single trigger action mapping to stop ghost clicks
     function preventGhostClick(e, actionType) {
       e.preventDefault(); 
       if (actionType === 'BUTTON_A' || actionType === 'BUTTON_B') {
         btnAction(actionType);
-        // Visual press state
         e.target.classList.add('active-press');
         setTimeout(() => e.target.classList.remove('active-press'), 150);
       } else if (actionType === 'HOME') {
@@ -450,12 +420,10 @@
       if (machineState === 'PLAYING') {
         sendSignal(buttonStr);
       } else if (machineState === 'STATIC' && buttonStr === 'BUTTON_A') {
-        // Progress from Press Start to Menu
         machineState = 'MENU';
         staticSplash.style.display = 'none';
         dosMenu.style.display = 'flex';
       } else if (machineState === 'MENU' && buttonStr === 'BUTTON_A') {
-        // Boot selected game
         machineState = 'PLAYING';
         dosMenu.style.display = 'none';
         gameFrame.style.display = 'block';
@@ -465,43 +433,33 @@
     }
 
     function btnHome() {
-      // Home button returns directly to the Static "Press Start" screen, bypassing boot
       if (machineState === 'PLAYING' || machineState === 'MENU') {
         gameFrame.src = ""; 
         gameFrame.style.display = 'none';
         dosMenu.style.display = 'none';
-        
         machineState = 'STATIC';
         staticSplash.style.display = 'flex';
         isPlaying = false;
+        staticStartTime = performance.now();
+        requestAnimationFrame(staticLoop);
       }
     }
 
-    /* --- ADVANCED JOYSTICK DRAG & HOLD LOGIC --- */
     const joyBase = document.getElementById('joystick-base');
     const joyStick = document.getElementById('joystick-stick');
-    
     let isDragging = false;
     let currentDir = null;
-    const maxRadius = 35; // Maximum visual travel of the stick
-    const deadzone = 15;  // Minimum pixels required to trigger a direction
+    const maxRadius = 35; 
+    const deadzone = 15;  
 
-    // Continuous Hold Tracking Variables
     let holdTimer = null;
     let repeatInterval = null;
 
     function startSendingDirection(dir) {
-      stopSendingDirection(); // Clear any existing timers
-      
-      // Fire the initial directional input immediately
+      stopSendingDirection();
       pressDpad(dir); 
-      
-      // Wait 300ms to confirm the user is intentionally "holding" it
       holdTimer = setTimeout(() => {
-        // Once held, continuously pulse the direction to the game every 100ms
-        repeatInterval = setInterval(() => {
-          pressDpad(dir);
-        }, 100); 
+        repeatInterval = setInterval(() => { pressDpad(dir); }, 100); 
       }, 300);
     }
 
@@ -540,7 +498,6 @@
       const dy = clientY - centerY;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      // Clamp visual stick rendering to the max radius
       let stickX = dx;
       let stickY = dy;
       if (distance > maxRadius) {
@@ -551,7 +508,6 @@
 
       joyStick.style.transform = `translate(${stickX}px, ${stickY}px)`;
 
-      // Logic translation: determine dominant 4-way direction
       let newDir = null;
       if (distance > deadzone) {
         if (Math.abs(dx) > Math.abs(dy)) {
@@ -561,14 +517,10 @@
         }
       }
 
-      // Trigger input only if direction state changes
       if (newDir !== currentDir) {
         currentDir = newDir;
-        if (currentDir) {
-          startSendingDirection(currentDir); // Start the initial press and hold loop
-        } else {
-          stopSendingDirection(); // Stick returned to center deadzone
-        }
+        if (currentDir) startSendingDirection(currentDir);
+        else stopSendingDirection();
       }
     }
 
@@ -577,12 +529,11 @@
       if (!isDragging) return;
       isDragging = false;
       currentDir = null;
-      stopSendingDirection(); // Stop all hold events upon release
+      stopSendingDirection(); 
       joyStick.classList.remove('dragging');
-      joyStick.style.transform = `translate(0px, 0px)`; // Snap back to center
+      joyStick.style.transform = `translate(0px, 0px)`;
     }
 
-    // Attach dragging events
     joyBase.addEventListener('mousedown', startDrag);
     joyBase.addEventListener('touchstart', startDrag, { passive: false });
     window.addEventListener('mousemove', moveDrag);
@@ -590,46 +541,131 @@
     window.addEventListener('mouseup', endDrag);
     window.addEventListener('touchend', endDrag);
 
-    /* --- ANIMATED BOOT SPLASH LOGIC --- */
+    function drawMatrix(context, matrix, palette, startX, startY, pixelSize, alpha = 1.0) {
+        context.globalAlpha = alpha;
+        for (let y = 0; y < matrix.length; y++) {
+            for (let x = 0; x < matrix[y].length; x++) {
+                const colorCode = matrix[y][x];
+                if (colorCode !== '0' && palette[colorCode]) {
+                    context.fillStyle = palette[colorCode];
+                    context.fillRect(startX + (x * pixelSize), startY + (y * pixelSize), pixelSize, pixelSize);
+                }
+            }
+        }
+        context.globalAlpha = 1.0;
+    }
+
+    /* --- BWAA BRULE STACKED ANIMATION (STATIC SPLASH) --- */
+    const BWAA_PALETTE = {
+        '0': null,
+        '1': '#540E11', // Deep Bordeaux Border 
+        '2': '#ffffff'  // Solid White Stencil Fill
+    };
+
+    // Center stacked 2D array matrix matching the thick arcade spelling specs
+    const BWAA_SPRITE = [
+        "000001111110000110000110000011110000001111000000",
+        "000012222221001221001221000122221000012222100000",
+        "000012211221001221001221001221122100122112210000",
+        "000012222210001221001221001222222100122222210000",
+        "000012211221001221111221001221122100122112210000",
+        "000012211221001222222221001221122100122112210000",
+        "000012222221000122112210001221122100122112210000",
+        "000001111110000011001100000110011000011001100000",
+        "000000000000000000000000000000000000000000000000",
+        "000000000000000000000000000000000000000000000000",
+        "011111100001111110000110011000011000000001111110",
+        "122222210012222221001221122100122100000012222221",
+        "122112210012211221001221122100122100000012210000",
+        "122222100012222210001221122100122100000012222100",
+        "122112210012211221001221122100122100000012210000",
+        "122112210012211221001221122100122111100012211110",
+        "122222210012211221000122221000122222210012222221",
+        "011111100001100110000011110000011111100001111110"
+    ];
+
+    const sCanvas = document.getElementById('bwaaCanvas');
+    const sCtx = sCanvas.getContext('2d');
+    sCtx.imageSmoothingEnabled = false;
+
+    function staticLoop(timestamp) {
+        if (machineState !== 'STATIC') return;
+
+        sCtx.fillStyle = '#000000';
+        sCtx.fillRect(0, 0, sCanvas.width, sCanvas.height);
+
+        const elapsed = (timestamp - staticStartTime) / 1000;
+        const zoomDuration = 4.0; 
+        let currentScale;
+
+        // Cinematic zoom into resting place
+        if (elapsed < zoomDuration) {
+            const t = elapsed / zoomDuration;
+            const easeOut = 1 - Math.pow(1 - t, 3);
+            currentScale = 0.5 + (1.2 - 0.5) * easeOut; // Scales up gently to max size
+        } else {
+            currentScale = 1.2; 
+        }
+
+        sCtx.save();
+        // Central positioning with slight vertical offset above the prompt
+        sCtx.translate(sCanvas.width / 2, sCanvas.height / 2 - 30);
+        sCtx.scale(currentScale, currentScale);
+
+        const pSize = 5; 
+        const spriteW = BWAA_SPRITE[0].length * pSize;
+        const spriteH = BWAA_SPRITE.length * pSize;
+        
+        drawMatrix(sCtx, BWAA_SPRITE, BWAA_PALETTE, -spriteW/2, -spriteH/2, pSize);
+        sCtx.restore();
+
+        // Lock text appearance exclusively until AFTER animation finishes computing frames
+        if (elapsed >= zoomDuration) {
+            const blink = Math.floor(timestamp / 500) % 2 === 0;
+            if (blink) {
+                sCtx.fillStyle = '#12AEA2'; 
+                sCtx.font = 'bold 24px "Courier New"';
+                sCtx.textAlign = 'center';
+                sCtx.fillText("PRESS A TO START", sCanvas.width / 2, sCanvas.height - 30);
+            }
+        }
+
+        requestAnimationFrame(staticLoop);
+    }
+
+    /* --- ANIMATED BOOT SPLASH LOGIC (BUFFALOHYDE) --- */
     const canvas = document.getElementById('introCanvas');
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
 
     const PALETTE = {
         '0': null, 
-        '1': '#2d2d2d', // Dark Charcoal (Main Buffalo Body)
-        '2': '#ffffff', // White (Horns/Hooves)
-        '3': '#12AEA2', // Teal (Beard/Accents)
-        '4': '#AD1C21', // Crimson Red Text
-        '5': '#F7C844', // Gold Sparkle
-        '6': '#ffffff', // White Sparkle Center
-        '7': '#12AEA2'  // Teal (Prompt text)
+        '1': '#1e1b18', 
+        '2': '#dcd7c9', 
+        '3': '#c7f1ef', 
+        '4': '#AD1C21', 
+        '5': '#F7C844', 
+        '6': '#ffffff'  
     };
 
     const BUFFALO_SPRITE = [
-        "0000000000000000",
-        "0000000011100000",
-        "0000000111120000",
-        "0000011111121000",
-        "0000111111111000",
-        "0001111111111000",
-        "0001111111111000",
-        "0001111111133000",
-        "0001111111130000",
-        "0000111111100000",
-        "0000100100100000",
-        "0000100100100000",
-        "0000000000000000",
-        "0000000000000000",
-        "0000000000000000",
-        "0000000000000000"
+      "0000000011100000",
+      "0000000111120000",
+      "0000011111121000",
+      "0000111111111000",
+      "0001111111111000",
+      "0001111111111000",
+      "0001111111133000",
+      "0001111111130000",
+      "0000111111100000",
+      "0000100100100000",
+      "0000100100100000"
     ];
 
     let splashState = 'WAITING'; 
     let animStartTime = 0;
     let audioCtx = null;
 
-    // Starts animation on any tap during the BOOT phase
     window.addEventListener('click', () => {
         if (machineState === 'BOOT' && splashState === 'WAITING') {
             initAudio();
@@ -639,7 +675,6 @@
         }
     });
 
-    // Also allow touchstart for faster response on mobile
     window.addEventListener('touchstart', () => {
         if (machineState === 'BOOT' && splashState === 'WAITING') {
             initAudio();
@@ -650,9 +685,7 @@
     }, {passive: true});
 
     function initAudio() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
@@ -676,20 +709,6 @@
         osc.stop(audioCtx.currentTime + delay + duration);
     }
 
-    function drawMatrix(matrix, startX, startY, pixelSize, alpha = 1.0) {
-        ctx.globalAlpha = alpha;
-        for (let y = 0; y < matrix.length; y++) {
-            for (let x = 0; x < matrix[y].length; x++) {
-                const colorCode = matrix[y][x];
-                if (colorCode !== '0' && PALETTE[colorCode]) {
-                    ctx.fillStyle = PALETTE[colorCode];
-                    ctx.fillRect(startX + (x * pixelSize), startY + (y * pixelSize), pixelSize, pixelSize);
-                }
-            }
-        }
-        ctx.globalAlpha = 1.0;
-    }
-
     function drawSparkle(x, y, scale, rotation) {
         ctx.save();
         ctx.translate(x, y);
@@ -703,14 +722,15 @@
         ctx.restore();
     }
 
-    function gameLoop(timestamp) {
+    function bootLoop(timestamp) {
+        if (machineState !== 'BOOT') return;
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        if (splashState === 'WAITING' && machineState === 'BOOT') {
+        if (splashState === 'WAITING') {
             const blink = Math.floor(timestamp / 500) % 2 === 0;
             if (blink) {
-                ctx.fillStyle = PALETTE['7'];
+                ctx.fillStyle = '#12AEA2';
                 ctx.font = 'bold 24px "Courier New"';
                 ctx.textAlign = 'center';
                 ctx.fillText("POWER ON", canvas.width / 2, canvas.height / 2 - 10);
@@ -743,7 +763,8 @@
             }
             else {
                 splashState = 'DONE';
-                transitionToStatic(); // Automatically move to the static arcade menu state
+                transitionToStatic();
+                return;
             }
 
             if (splashState === 'PLAYING') {
@@ -755,25 +776,17 @@
                 const pSize = 12; 
                 const spriteW = BUFFALO_SPRITE[0].length * pSize;
                 const spriteH = BUFFALO_SPRITE.length * pSize;
-                
-                drawMatrix(BUFFALO_SPRITE, -spriteW/2, -spriteH/2, pSize);
+                drawMatrix(ctx, BUFFALO_SPRITE, PALETTE, -spriteW/2, -spriteH/2, pSize);
 
-                // BuffaloHyde Creative Text
                 ctx.fillStyle = PALETTE['4'];
                 ctx.textAlign = 'center';
                 ctx.letterSpacing = "-1px";
-                
                 ctx.font = 'bold 36px "Courier New"';
-                ctx.fillText("BUFFALOHYDE", 0, spriteH/2 + 20);
-                
+                ctx.fillText("BUFFALOHYDE", 0, spriteH/2 + 30);
                 ctx.font = 'bold 24px "Courier New"';
-                ctx.fillText("CREATIVE", 0, spriteH/2 + 50);
-                
-                ctx.letterSpacing = "0px"; 
-
+                ctx.fillText("CREATIVE", 0, spriteH/2 + 60);
                 ctx.restore();
 
-                // Sparkles
                 if (elapsed > 1.2 && elapsed < 2.0) {
                     const sparkleLife = elapsed - 1.2;
                     if (sparkleLife < 0.6) {
@@ -786,15 +799,9 @@
                 }
             }
         }
-
-        if(splashState !== 'DONE') {
-          requestAnimationFrame(gameLoop);
-        }
+        requestAnimationFrame(bootLoop);
     }
-
-    requestAnimationFrame(gameLoop);
-
+    requestAnimationFrame(bootLoop);
   </script>
-
 </body>
 </html>
