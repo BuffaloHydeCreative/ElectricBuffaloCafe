@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>La Loche: Le Grand Portage</title>
+<style>
+  body {
+    margin: 0; padding: 0;
+    background: transparent;
+    display: flex; justify-content: center; align-items: center;
+    height: 100vh; width: 100vw;
+    font-family: 'Courier New', Courier, monospace;
+    user-select: none; touch-action: manipulation; overflow: hidden;
+  }
+  #game-container {
+    width: 100%; height: 100%; max-width: 600px;
+    display: flex; flex-direction: column; justify-content: center;
+    box-sizing: border-box; padding: 10px;
+  }
+  #header {
+    flex: 0 0 auto; display: flex; justify-content: space-between;
+    color: #F7C844; font-weight: bold; margin-bottom: 10px;
+    border-bottom: 2px solid #387C44; padding-bottom: 5px;
+    font-size: 14px; text-transform: uppercase;
+    text-shadow: 1px 1px 0 #000;
+  }
+  #screen-container {
+    flex: 0 0 auto; width: 100%;
+    aspect-ratio: 4 / 3; 
+    border: 4px solid #D4D0C5; 
+    position: relative; background: #000; 
+    overflow: hidden; box-sizing: border-box;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  }
+  canvas {
+    width: 100%; height: 100%;
+    display: block; image-rendering: pixelated;
+  }
+  .overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85); 
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    color: #fff; text-align: center; padding: 15px; box-sizing: border-box;
+    z-index: 10;
+  }
+  h2 { color: #12AEA2; margin: 0 0 10px 0; font-size: 22px; text-transform: uppercase; text-shadow: 2px 2px #FB6604;}
+  p { font-size: 12px; line-height: 1.5; margin: 0 0 15px 0; color: #D4D0C5; }
+  .blink-text { font-weight: bold; color: #F7C844; font-size: 14px; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div id="header">
+    <span id="title-display">LA LOCHE PORTAGE</span>
+    <span id="score-display">STAGE: 1</span>
+  </div>
+  
+  <div id="screen-container">
+    <canvas id="gameCanvas" width="320" height="240"></canvas>
+    
+    <div id="intro-screen" class="overlay">
+      <h2>LE GRAND PORTAGE</h2>
+      <p>Mon Ami is fumblin'<br>cargo down de portage trail!<br><br>Reach de canoe what is waitin' for you.<br>Climb fast to prevent de cargo from bein' lost!<br><br>D-PAD: Move/Climb<br>BUTTON 'A': Jump</p>
+      <div class="blink-text">PRESS 'A' TO START</div>
+    </div>
+    
+    <div id="msg" class="overlay" style="display: none;">
+      <h2 style="color: #AD1C21;">Kashkahamwakan!</h2>
+      <div class="blink-text">PRESS 'A' TO RETRY</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const cvs = document.getElementById('gameCanvas');
+  const ctx = cvs.getContext('2d');
+  const introScreen = document.getElementById('intro-screen');
+  const msgScreen = document.getElementById('msg');
+  const titleDisplay = document.getElementById('title-display');
+  const scoreDisplay = document.getElementById('score-display');
+  
+  let state = 'START'; 
+  let stage = 1;
+  let frame = 0;
+  let shakeX = 0, shakeY = 0;
+  let keys = { up: false, down: false, left: false, right: false, a: false, a_pressed: false };
+  
+  // Cargo Scoring Mechanics
+  let cargoLost = 0;
+
+  // High Quality 16-Bit Environment Palette
+  const C = {
+    SKIN: '#F7D0A0', RED: '#AD1C21', BLUE: '#0F6F9E', BLACK: '#000000', 
+    BEIGE: '#D4D0C5', WHITE: '#FFF', ORANGE: '#FB6604', TEAL: '#12AEA2', GOLD: '#F7C844',
+    DARK_RED: '#540E11', GREY: '#6A6B6E', BROWN: '#6B4226', DARK_BROWN: '#4A2E1B',
+    SKY_TOP: '#3b7097', SKY_BOT: '#8ab4d4', CLOUD: '#ffffff',
+    GRASS: '#387C44', GRASS_LIGHT: '#4E9E5E', 
+    DIRT: '#E4A672', DIRT_DARK: '#A86D3F'
+  };
+
+  const drawMatrix = (matrix, x, y, scale, colors, flip = false) => {
+    for(let r=0; r<matrix.length; r++) {
+      for(let c=0; c<matrix[r].length; c++) {
+        let v = matrix[r][c];
+        if(v !== 0 && colors[v]) {
+          ctx.fillStyle = colors[v];
+          let drawX = flip ? (x + (matrix[r].length - 1 - c) * scale) : (x + c * scale);
+          ctx.fillRect(Math.floor(drawX), Math.floor(y + r*scale), scale, scale);
+        }
+      }
+    }
+  };
+
+  const S_PLAYER_WALK_1 = [
+    [8,8,8,8,0,0,1,1,1,0],
+    [8,9,8,8,0,1,2,2,2,1],
+    [8,8,9,8,9,0,2,2,2,2],
+    [8,8,8,8,0,3,3,4,4,3],
+    [0,8,8,0,3,3,4,4,3,3],
+    [0,0,0,0,0,3,3,3,3,0],
+    [0,0,0,0,0,5,5,5,5,0],
+    [0,0,0,0,0,5,0,0,5,0]
+  ]; 
+  const S_PLAYER_WALK_2 = [
+    [8,8,8,8,0,0,1,1,1,0],
+    [8,9,8,8,0,1,2,2,2,1],
+    [8,8,9,8,9,0,2,2,2,2],
+    [8,8,8,8,0,3,3,4,4,3],
+    [0,8,8,0,3,3,4,4,3,3],
+    [0,0,0,0,0,3,3,3,3,0],
+    [0,0,0,0,0,5,5,5,5,0],
+    [0,0,0,0,0,0,5,5,0,0] 
+  ];
+  const S_RIVAL = [
+    [0,0,5,5,5,0,0,0],
+    [0,0,2,2,2,2,0,0],
+    [0,3,3,3,3,3,3,0],
+    [3,3,3,3,3,3,3,6],
+    [3,3,3,4,4,3,3,6],
+    [0,0,7,7,7,7,0,0],
+    [0,7,7,0,0,7,7,0]
+  ]; 
+  const S_CRATE = [
+    [1,1,1,1,1,1],
+    [1,2,3,3,2,1],
+    [1,3,1,1,3,1],
+    [1,3,1,1,3,1],
+    [1,2,3,3,2,1],
+    [1,1,1,1,1,1]
+  ]; 
+  const S_ROCK = [
+    [0,2,3,0],
+    [2,1,2,3],
+    [3,2,1,2],
+    [0,3,2,0]
+  ]; 
+  const S_CANOE = [
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [2,1,1,1,1,1,1,1,1,1,1,1,1,1,2],
+    [0,2,3,3,3,3,3,3,3,3,3,3,3,2,0],
+    [0,0,2,2,2,2,2,2,2,2,2,2,2,0,0]
+  ]; 
+
+  const STAGES = [
+    {
+      name: "THE GRAND PORTAGE",
+      type: "RAMP",
+      goalY: 45, goalX: 200,
+      platforms: [
+        {x1:0, y1:220, x2:320, y2:220},    
+        {x1:50, y1:166, x2:320, y2:160},   
+        {x1:0, y1:104, x2:270, y2:110},    
+        {x1:10, y1:45, x2:70, y2:45},      
+        {x1:200, y1:45, x2:320, y2:45}     
+      ],
+      ladders: [
+        {x: 260, y: 162, h: 58}, 
+        {x: 60, y: 106, h: 60}, 
+        {x: 240, y: 45, h: 63}
+      ],
+      movers: []
+    },
+    {
+      name: "KETTLE RAPIDS",
+      type: "CONVEYOR",
+      goalY: 45, goalX: 200,
+      platforms: [
+        {x1:0, y1:220, x2:320, y2:220}, 
+        {x1:50, y1:166, x2:320, y2:160},   
+        {x1:0, y1:104, x2:80, y2:106},   
+        {x1:220, y1:108, x2:280, y2:110},
+        {x1:10, y1:45, x2:70, y2:45},      
+        {x1:200, y1:45, x2:320, y2:45}     
+      ],
+      ladders: [
+        {x: 260, y: 162, h: 58}, 
+        {x: 40, y: 105, h: 61}, 
+        {x: 240, y: 45, h: 64}
+      ],
+      movers: [
+        {x: 90, y: 107, w: 50, minX: 85, maxX: 215, spd: 1.2, dir: 1, spdY: 0, dirY: 1} 
+      ]
+    },
+    {
+      name: "METHYE PORTAGE",
+      type: "ROCKFALL",
+      goalY: 45, goalX: 235,
+      platforms: [
+        {x1:0, y1:220, x2:320, y2:220}, // Base
+        {x1:100, y1:215, x2:280, y2:195}, // Plat 1 (rolls left)
+        {x1:40, y1:150, x2:220, y2:175}, // Plat 2 (rolls right)
+        {x1:100, y1:130, x2:280, y2:105}, // Plat 3 (rolls left)
+        {x1:40, y1:50, x2:240, y2:75}, // Plat 4 (rolls right)
+        {x1:10, y1:45, x2:60, y2:45}, // Rival Platform
+        {x1:220, y1:45, x2:320, y2:45} // Checkpoint
+      ],
+      ladders: [
+        {x: 260, y: 197, h: 23}, // Base to Plat 1
+        {x: 120, y: 161, h: 48}, // Plat 1 to Plat 2
+        {x: 200, y: 116, h: 56}, // Plat 2 to Plat 3
+        {x: 120, y: 60, h: 66},  // Plat 3 to Plat 4
+        {x: 230, y: 45, h: 29}   // Plat 4 to Checkpoint
+      ],
+      movers: []
+    }
+  ];
+
+  let player, rival, hazards, currentLvl;
+  let playerFacingRight = true;
+
+  function initLevel() {
+    let lvlIdx = (stage - 1) % STAGES.length;
+    currentLvl = JSON.parse(JSON.stringify(STAGES[lvlIdx])); 
+    titleDisplay.innerText = currentLvl.name;
+    scoreDisplay.innerText = `STAGE: ${stage}`;
+    
+    cargoLost = 0; // Reset backend counter
+    
+    player = { x: 10, y: 195, vx: 0, vy: 0, w: 16, h: 16, grounded: false, climbing: false, dead: false };
+    rival = { x: 25, y: 27, state: 'IDLE', timer: 80 }; 
+    hazards = [];
+  }
+
+  function getPlatformY(plat, x) {
+    if (x < plat.x1 || x > plat.x2) return null;
+    if (plat.y1 === plat.y2) return plat.y1;
+    let ratio = (x - plat.x1) / (plat.x2 - plat.x1);
+    return plat.y1 + ratio * (plat.y2 - plat.y1);
+  }
+
+  function handleRivalAI() {
+    rival.timer--;
+    if (rival.state === 'IDLE' && rival.timer <= 0) {
+      let rand = Math.random();
+      let actionSpeed = Math.max(25, 70 - (stage * 4)); 
+      
+      if (rand > 0.65 && currentLvl.type !== 'CONVEYOR' && currentLvl.type !== 'ROCKFALL') {
+        rival.state = 'STUMBLE';
+      } else if (rand > 0.4 && hazards.length > 0) {
+        rival.state = 'LAUGH';
+      } else {
+        rival.state = 'HE_HO';
+      }
+      rival.timer = actionSpeed;
+    }
+
+    if (rival.state !== 'IDLE' && rival.timer <= 0) {
+      if (rival.state === 'HE_HO') {
+        hazards.push({ x: rival.x + 15, y: rival.y + 15, vx: 1.5, vy: 0, type: 'CRATE', w: 12, h: 12, bouncy: false });
+        cargoLost++; 
+      } else if (rival.state === 'STUMBLE') {
+        let dropX = Math.max(10, Math.min(310, player.x + (Math.random()*40 - 20)));
+        hazards.push({ x: dropX, y: 0, vx: 0, vy: 3.5, type: 'ROCK', w: 8, h: 8 });
+        shakeY = 3; setTimeout(()=>shakeY=0, 100);
+      } else if (rival.state === 'LAUGH') {
+        shakeX = 2; setTimeout(()=>shakeX=0, 100);
+        hazards.forEach(h => {
+          if(h.type === 'CRATE') {
+            h.vy = -3.5; 
+            h.vx = (h.vx > 0 ? -1 : 1) * (1.2 + Math.random());
+            h.bouncy = true; 
+          }
+        });
+      }
+      rival.state = 'IDLE';
+      rival.timer = Math.max(45, 120 - (stage * 10)); 
+    }
+  }
+
+  function updateHazards() {
+    for (let i = hazards.length - 1; i >= 0; i--) {
+      let h = hazards[i];
+      if (h.type === 'CRATE') {
+        h.vy += 0.35; 
+        let nextY = h.y + h.vy;
+        h.x += h.vx;
+        
+        let grounded = false;
+        let activePlat = null;
+        let landedThisFrame = false;
+
+        for (let plat of currentLvl.platforms) {
+          let pY = getPlatformY(plat, h.x + h.w/2);
+          if (pY !== null && h.y + h.h <= pY + 8 && nextY + h.h >= pY) {
+            h.y = pY - h.h;
+            if (h.vy > 0.5) landedThisFrame = true;
+
+            if (h.bouncy && h.vy > 2) {
+              h.vy = -h.vy * 0.5;
+              h.bouncy = false;
+              landedThisFrame = false; 
+            } else {
+              h.vy = 0;
+            }
+            grounded = true;
+            activePlat = plat;
+          }
+        }
+        
+        for (let m of currentLvl.movers) {
+          if (h.x + h.w > m.x && h.x < m.x + m.w && h.y + h.h <= m.y + 12 && nextY + h.h >= m.y - 12) {
+            h.y = m.y - h.h;
+            if (h.vy > 0.5) landedThisFrame = true;
+            h.vy = 0;
+            if (m.spd) h.x += m.spd * m.dir;
+            grounded = true;
+          }
+        }
+
+        if (grounded && activePlat) {
+          let slope = (activePlat.y2 - activePlat.y1) / (activePlat.x2 - activePlat.x1);
+          
+          if (currentLvl.type === 'ROCKFALL') {
+            // High-speed zigzag rolling mechanics
+            if (landedThisFrame) {
+              h.vy = -1.5; // Quick erratic bounciness on landing
+            } else {
+              h.vx += slope * 1.5; // Aggressive slope acceleration
+            }
+            h.vx = Math.max(-3.0, Math.min(3.0, h.vx));
+          } else {
+            // Standard momentum
+            if (landedThisFrame) h.vx *= 0.4;
+            if (slope === 0) {
+              if (h.vx > 0) h.vx = Math.max(0, h.vx - 0.05);
+              else if (h.vx < 0) h.vx = Math.min(0, h.vx + 0.05);
+            } else {
+              h.vx += slope * 1.0; 
+            }
+            h.vx = Math.max(-1.8, Math.min(1.8, h.vx));
+          }
+        }
+
+        if (!grounded) h.y = nextY;
+
+        if (grounded && Math.random() < 0.03) {
+          for (let lad of currentLvl.ladders) {
+            if (Math.abs((h.x+h.w/2) - (lad.x+10)) < 6 && h.y+h.h <= lad.y+5) {
+               h.x = lad.x + 5 - h.w/2;
+               h.vy = 1; 
+               h.vx *= 0.5; 
+            }
+          }
+        }
+        
+        if (h.y > 250 || h.x < -20 || h.x > 340) hazards.splice(i, 1);
+        
+      } else if (h.type === 'ROCK') {
+        h.y += h.vy; 
+        if (h.y > 250) hazards.splice(i, 1);
+      }
+
+      if (!player.dead && player.x + 2 < h.x + h.w && player.x + player.w - 2 > h.x &&
+          player.y + 2 < h.y + h.h && player.y + player.h > h.y + 2) {
+        killPlayer();
+      }
+    }
+  }
+
+  function updatePlayer() {
+    if (player.dead) {
+      player.vy += 0.4;
+      player.y += player.vy;
+      return;
+    }
+
+    let midX = player.x + player.w/2;
+    let onLadder = false;
+    let activeLadder = null;
+
+    for (let lad of currentLvl.ladders) {
+      if (Math.abs(midX - (lad.x + 10)) < 10 && player.y + player.h >= lad.y && player.y <= lad.y + lad.h) {
+        onLadder = true;
+        activeLadder = lad;
+      }
+    }
+
+    if (player.climbing) {
+      player.vx = 0;
+      player.vy = 0;
+      if (keys.up) player.vy = -1.2;
+      if (keys.down) player.vy = 1.2;
+      
+      player.y += player.vy;
+      if (activeLadder) player.x = activeLadder.x + 10 - player.w/2;
+
+      if (!onLadder || keys.left || keys.right) {
+        player.climbing = false;
+      }
+    } else {
+      let moveSpeed = 1.0; 
+      if (keys.left) { player.vx = -moveSpeed; playerFacingRight = false; }
+      else if (keys.right) { player.vx = moveSpeed; playerFacingRight = true; }
+      else player.vx = 0;
+
+      player.vy += 0.45; 
+      let nextY = player.y + player.vy;
+      player.x += player.vx;
+
+      player.grounded = false;
+
+      for (let plat of currentLvl.platforms) {
+        let pY = getPlatformY(plat, midX);
+        if (pY !== null && player.vy >= 0 && player.y + player.h <= pY + 8 && nextY + player.h >= pY) {
+          player.y = pY - player.h;
+          player.vy = 0;
+          player.grounded = true;
+        }
+      }
+
+      // Mover interactions
+      for (let m of currentLvl.movers) {
+        if (player.x + player.w > m.x && player.x < m.x + m.w && player.vy >= 0 && player.y + player.h <= m.y + 12 && nextY + player.h >= m.y - 12) {
+          player.y = m.y - player.h;
+          player.vy = 0;
+          if (m.spd) player.x += m.spd * m.dir; 
+          player.grounded = true;
+        }
+      }
+
+      if (!player.grounded) player.y = nextY;
+
+      if (keys.a && !keys.a_pressed && player.grounded) {
+        player.vy = -4.0;
+        player.grounded = false;
+        keys.a_pressed = true;
+      }
+      if (!keys.a) keys.a_pressed = false;
+
+      if (onLadder && (keys.up || keys.down) && activeLadder) {
+        if (keys.down && player.grounded && player.y + player.h >= activeLadder.y + activeLadder.h) {} 
+        else {
+          player.climbing = true;
+          player.x = activeLadder.x + 10 - player.w/2;
+        }
+      }
+    }
+
+    player.x = Math.max(0, Math.min(320 - player.w, player.x));
+    if (player.y > 240) killPlayer();
+
+    // Universal Level Complete Thresholds
+    let targetY = currentLvl.goalY || 45;
+    let targetX = currentLvl.goalX || 200;
+    if (Math.abs(player.y - targetY) < 30 && player.grounded && player.x > targetX) {
+      levelComplete();
+    }
+  }
+
+  function updateMovers() {
+    for (let m of currentLvl.movers) {
+      if (m.spd) {
+        m.x += m.spd * m.dir;
+        if (m.x <= m.minX || m.x + m.w >= m.maxX) m.dir *= -1;
+      }
+      if (m.spdY) {
+        m.y += m.spdY * m.dirY;
+        if (m.y <= m.minY || m.y >= m.maxY) m.dirY *= -1;
+      }
+    }
+  }
+
+  function killPlayer() {
+    if (player.dead) return;
+    player.dead = true;
+    player.vy = -4.0; 
+    setTimeout(() => {
+      state = 'GAMEOVER';
+      msgScreen.style.display = 'flex';
+    }, 1500);
+  }
+
+  function levelComplete() {
+    state = 'LEVEL_CLEAR';
+    rival.state = 'IDLE'; 
+    
+    setTimeout(() => {
+      stage++;
+      initLevel();
+      state = 'PLAYING';
+    }, 3500);
+  }
+
+  function hexToRgb(hex) {
+    let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0};
+  }
+
+  function lerpColor(c1, c2, t) {
+    if (t <= 0) return c1; if (t >= 1) return c2;
+    let rgb1 = hexToRgb(c1), rgb2 = hexToRgb(c2);
+    let r = Math.round(rgb1.r + (rgb2.r - rgb1.r) * t);
+    let g = Math.round(rgb1.g + (rgb2.g - rgb1.g) * t);
+    let b = Math.round(rgb1.b + (rgb2.b - rgb1.b) * t);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function drawBackground() {
+    // Pixel Block Line Gradient mimicking HTML Games logic
+    const bands = 16;
+    const bandHeight = 240 / bands;
+    for (let i = 0; i < bands; i++) {
+      let t = i / (bands - 1);
+      ctx.fillStyle = lerpColor(C.SKY_TOP, C.SKY_BOT, t);
+      ctx.fillRect(0, Math.floor(i * bandHeight), 320, Math.ceil(bandHeight));
+    }
+
+    // Drifting Parallax Clouds
+    ctx.fillStyle = C.CLOUD;
+    let cloudOffset = (frame * 0.15) % 320;
+    
+    ctx.fillRect(320 - cloudOffset, 20, 50, 12);
+    ctx.fillRect(330 - cloudOffset, 12, 25, 6);
+    
+    ctx.fillRect(150 - (cloudOffset*1.1)%320, 45, 70, 15);
+    ctx.fillRect(170 - (cloudOffset*1.1)%320, 35, 30, 8);
+    
+    ctx.fillRect(50 - (cloudOffset*0.9)%320, 10, 40, 10);
+  }
+
+  function drawGame() {
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
+    drawBackground();
+
+    // Render Fully Shaded 16-Bit Wooden Ladders
+    for (let lad of currentLvl.ladders) {
+      ctx.fillStyle = C.BROWN;
+      ctx.fillRect(lad.x, lad.y, 4, lad.h);
+      ctx.fillRect(lad.x + 16, lad.y, 4, lad.h);
+      ctx.fillStyle = C.DARK_BROWN; 
+      ctx.fillRect(lad.x+2, lad.y, 2, lad.h); 
+      ctx.fillRect(lad.x+18, lad.y, 2, lad.h);
+
+      for(let step=4; step<lad.h; step+=8) {
+        ctx.fillStyle = C.BROWN;
+        ctx.fillRect(lad.x, lad.y + step, 20, 3);
+        ctx.fillStyle = C.BEIGE; 
+        ctx.fillRect(lad.x, lad.y + step, 2, 3);
+        ctx.fillRect(lad.x+18, lad.y + step, 2, 3);
+      }
+    }
+
+    // Render Platforms
+    for (let plat of currentLvl.platforms) {
+      // Custom solid wooden base for the Rival's platform
+      if (plat.x1 === 10 && plat.x2 === 60 && plat.y1 === 45) {
+        ctx.fillStyle = C.BROWN;
+        ctx.fillRect(plat.x1, plat.y1, plat.x2 - plat.x1, 25);
+        ctx.fillStyle = C.DARK_BROWN;
+        ctx.fillRect(plat.x1, plat.y1 + 10, plat.x2 - plat.x1, 15);
+        
+        ctx.fillStyle = C.BEIGE;
+        ctx.fillRect(plat.x1 + 10, plat.y1, 2, 25);
+        ctx.fillRect(plat.x1 + 30, plat.y1, 2, 25);
+
+        ctx.strokeStyle = C.GRASS;
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(plat.x1, plat.y1+1); ctx.lineTo(plat.x2, plat.y2+1); ctx.stroke();
+        continue;
+      }
+
+      ctx.fillStyle = C.DIRT;
+      ctx.beginPath();
+      ctx.moveTo(plat.x1, plat.y1);
+      ctx.lineTo(plat.x2, plat.y2);
+      ctx.lineTo(plat.x2, plat.y2 + 25);
+      ctx.lineTo(plat.x1, plat.y1 + 25);
+      ctx.fill();
+
+      ctx.fillStyle = C.DIRT_DARK;
+      ctx.beginPath();
+      ctx.moveTo(plat.x1, plat.y1 + 10);
+      ctx.lineTo(plat.x2, plat.y2 + 10);
+      ctx.lineTo(plat.x2, plat.y2 + 25);
+      ctx.lineTo(plat.x1, plat.y1 + 25);
+      ctx.fill();
+
+      ctx.fillStyle = C.BROWN;
+      let platWidth = Math.abs(plat.x2 - plat.x1);
+      for (let px = 0; px < platWidth; px += 15) {
+        ctx.fillRect(Math.min(plat.x1, plat.x2) + px, Math.max(plat.y1, plat.y2) + 12 + (px%10), 4, 4);
+      }
+
+      ctx.strokeStyle = C.GRASS;
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(plat.x1, plat.y1+1); ctx.lineTo(plat.x2, plat.y2+1); ctx.stroke();
+      ctx.strokeStyle = C.GRASS_LIGHT;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(plat.x1, plat.y1-1); ctx.lineTo(plat.x2, plat.y2-1); ctx.stroke();
+    }
+
+    // Canoe Goal Rendering
+    let targetY = currentLvl.goalY || 45;
+    drawMatrix(S_CANOE, 260, targetY - 10, 2, {1: C.BROWN, 2: C.BEIGE, 3: C.DIRT_DARK});
+
+    // Movers rendering
+    for (let m of currentLvl.movers) {
+      ctx.fillStyle = C.BROWN;
+      ctx.fillRect(m.x, m.y, m.w, 8);
+      ctx.fillStyle = C.GRASS;
+      ctx.fillRect(m.x, m.y-2, m.w, 4);
+    }
+
+    // Rival rendering
+    let p_rival = { 1: C.RED, 2: C.SKIN, 3: C.RED, 4: C.GOLD, 5: C.TEAL, 6: C.BEIGE, 7: C.GREY };
+    if (rival.state === 'HE_HO') p_rival[2] = C.WHITE; 
+    if (rival.state === 'STUMBLE') p_rival[6] = C.RED; 
+    drawMatrix(S_RIVAL, rival.x, rival.y - (rival.state==='LAUGH' && frame%10<5 ? 4 : 0), 2.5, p_rival);
+    
+    if (rival.state === 'HE_HO') {
+      ctx.fillStyle = C.WHITE; ctx.font = "bold 12px Courier"; ctx.fillText("HE-HO!", rival.x+20, rival.y-5);
+    } else if (rival.state === 'LAUGH') {
+      ctx.fillStyle = C.GOLD; ctx.font = "bold 14px Courier"; ctx.fillText("HA HA!", rival.x+20, rival.y-5);
+    }
+
+    // Hazards
+    for (let h of hazards) {
+      if (h.type === 'CRATE') drawMatrix(S_CRATE, h.x, h.y, 2, {1: C.ORANGE, 2: C.BEIGE, 3: C.GOLD});
+      if (h.type === 'ROCK') drawMatrix(S_ROCK, h.x, h.y, 2, {1: C.TEAL, 2: C.GREY, 3: C.WHITE});
+    }
+
+    // Player Animation Engine
+    let activePlayerSprite = S_PLAYER_WALK_1;
+    if (!player.dead && player.grounded && Math.abs(player.vx) > 0.1) {
+      activePlayerSprite = (Math.floor(frame / 8) % 2 === 0) ? S_PLAYER_WALK_1 : S_PLAYER_WALK_2;
+    }
+
+    if (!player.dead) {
+      drawMatrix(activePlayerSprite, player.x - 2, player.y - 2, 2, {1:C.RED, 2:C.SKIN, 3:C.WHITE, 4:C.ORANGE, 5:C.BLUE, 8:C.BROWN, 9:C.DARK_BROWN}, !playerFacingRight);
+    } else {
+      ctx.save(); ctx.translate(player.x+6, player.y+8); ctx.rotate(Math.PI); ctx.translate(-(player.x+6), -(player.y+8));
+      drawMatrix(S_PLAYER_WALK_1, player.x - 2, player.y - 2, 2, {1:C.RED, 2:C.SKIN, 3:C.WHITE, 4:C.ORANGE, 5:C.BLUE, 8:C.BROWN, 9:C.DARK_BROWN});
+      ctx.restore();
+    }
+
+    if (state === 'LEVEL_CLEAR') {
+      ctx.fillStyle = "rgba(0,0,0,0.85)"; ctx.fillRect(0,0,320,240);
+      ctx.fillStyle = C.TEAL; ctx.font = "bold 22px Courier"; ctx.textAlign = "center";
+      ctx.fillText("PORTAGE CLEARED!", 160, 100);
+      
+      let performanceText = "";
+      if (cargoLost <= 5) performanceText = "Trés bien";
+      else if (cargoLost <= 10) performanceText = "C'est correct";
+      else performanceText = "J'ai mal fait";
+
+      ctx.fillStyle = C.GOLD; ctx.font = "bold 16px Courier";
+      ctx.fillText("WASTED CARGO: " + cargoLost, 160, 130);
+      ctx.fillStyle = C.BEIGE; ctx.font = "bold 16px Courier";
+      ctx.fillText(performanceText, 160, 155);
+      ctx.textAlign = "left";
+    }
+
+    ctx.restore();
+  }
+
+  function gameLoop() {
+    if (state === 'PLAYING') {
+      handleRivalAI();
+      updateMovers();
+      updateHazards();
+      updatePlayer();
+    }
+    
+    if (state !== 'START') {
+      drawGame();
+    }
+    
+    frame++;
+    requestAnimationFrame(gameLoop);
+  }
+
+  window.addEventListener('message', function(event) {
+    const cmd = event.data;
+    
+    if (cmd === 'DPAD_UP_PRESS' || cmd === 'DPAD_UP') keys.up = true;
+    if (cmd === 'DPAD_DOWN_PRESS' || cmd === 'DPAD_DOWN') keys.down = true;
+    if (cmd === 'DPAD_LEFT_PRESS' || cmd === 'DPAD_LEFT') keys.left = true;
+    if (cmd === 'DPAD_RIGHT_PRESS' || cmd === 'DPAD_RIGHT') keys.right = true;
+    if (cmd === 'BUTTON_A') {
+      keys.a = true;
+      if (state === 'START' || state === 'GAMEOVER') {
+        if (state === 'GAMEOVER') {
+          stage = 1; 
+        }
+        initLevel();
+        state = 'PLAYING';
+        introScreen.style.display = 'none';
+        msgScreen.style.display = 'none';
+      }
+    }
+    
+    if (cmd === 'DPAD_UP_RELEASE') keys.up = false;
+    if (cmd === 'DPAD_DOWN_RELEASE') keys.down = false;
+    if (cmd === 'DPAD_LEFT_RELEASE') keys.left = false;
+    if (cmd === 'DPAD_RIGHT_RELEASE') keys.right = false;
+    if (cmd === 'BUTTON_A_RELEASE') keys.a = false;
+    
+    if(cmd === 'DPAD_UP' || cmd === 'DPAD_DOWN' || cmd === 'DPAD_LEFT' || cmd === 'DPAD_RIGHT') {
+      setTimeout(() => {
+        if(cmd === 'DPAD_UP') keys.up = false;
+        if(cmd === 'DPAD_DOWN') keys.down = false;
+        if(cmd === 'DPAD_LEFT') keys.left = false;
+        if(cmd === 'DPAD_RIGHT') keys.right = false;
+      }, 150); 
+    }
+    if (cmd === 'BUTTON_A') setTimeout(() => keys.a = false, 150);
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if(e.key === 'ArrowUp') keys.up = true;
+    if(e.key === 'ArrowDown') keys.down = true;
+    if(e.key === 'ArrowLeft') keys.left = true;
+    if(e.key === 'ArrowRight') keys.right = true;
+    if(e.key === 'a' || e.key === 'Enter') window.postMessage('BUTTON_A', '*');
+  });
+  window.addEventListener('keyup', (e) => {
+    if(e.key === 'ArrowUp') keys.up = false;
+    if(e.key === 'ArrowDown') keys.down = false;
+    if(e.key === 'ArrowLeft') keys.left = false;
+    if(e.key === 'ArrowRight') keys.right = false;
+  });
+
+  requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
