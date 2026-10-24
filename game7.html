@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>La Loche: Le Grand Portage</title>
+<title>La Loche: The Grand Portage</title>
 <style>
   body {
     margin: 0; padding: 0;
@@ -61,13 +61,13 @@
     <canvas id="gameCanvas" width="320" height="240"></canvas>
     
     <div id="intro-screen" class="overlay">
-      <h2>LE GRAND PORTAGE</h2>
-      <p>Mon Ami is fumblin'<br>cargo down de portage trail!<br><br>Reach de canoe what is waitin' for you.<br>Climb fast to prevent de cargo from bein' lost!<br><br>D-PAD: Move/Climb<br>BUTTON 'A': Jump</p>
+      <h2>THE GRAND PORTAGE</h2>
+      <p>Your tipsy friend is fumbling his<br>cargo down the portage trail!<br><br>Reach the Canoe waiting for you.<br>Climb fast to prevent cargo from being lost!<br><br>D-PAD: Move/Climb<br>BUTTON 'A': Jump</p>
       <div class="blink-text">PRESS 'A' TO START</div>
     </div>
     
     <div id="msg" class="overlay" style="display: none;">
-      <h2 style="color: #AD1C21;">Kashkahamwakan!</h2>
+      <h2 style="color: #AD1C21;">WIPED OUT!</h2>
       <div class="blink-text">PRESS 'A' TO RETRY</div>
     </div>
   </div>
@@ -89,6 +89,143 @@
   
   // Cargo Scoring Mechanics
   let cargoLost = 0;
+
+  // --- AUDIO ENGINE: WOODLAND KONG ---[cite: 1, 2]
+  let audioCtx = null;
+  let chiptuneInterval = null;
+  let currentChiptuneStep = 0;
+
+  const BPM = 115; 
+  const noteLength = 60 / BPM / 4; 
+
+  const CHIPTUNE_NOTES = {
+      'G1': 49.00,  'A1': 55.00,  'Bb1': 58.27, 'B1': 61.74,
+      'C2': 65.41,  'C#2': 69.30, 'D2': 73.42,  'E2': 82.41,
+      'E4': 329.63, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
+      'D5': 587.33, 'E5': 659.25, 'G5': 783.99, 'A5': 880.00
+  };
+
+  const woodlandLead = [
+      'E5', 'D5', 'B4', 'A4', 'G4', 'A4', 'B4', null,
+      'E5', 'G5', 'A5', null, 'G5', 'E5', 'D5', null,
+      'B4', 'A4', 'G4', 'E4', 'G4', 'A4', 'B4', 'D5',
+      'E5', null, 'E5', null, 'E5', 'D5', 'E5', null
+  ];
+
+  const barrelBass = [
+      'E2', null, 'D2', null, 'C2', null, 'B1', null,
+      'A1', null, 'G1', null, 'A1', null, 'B1', null,
+      'C2', null, 'B1', null, 'Bb1', null, 'A1', null,
+      'E2', 'E2', 'D2', 'D2', 'C2', 'C2', 'B1', null
+  ];
+
+  function initAudio() {
+      if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  function playTone(freq, type, duration, volume) {
+      if (!freq || !audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+      gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration - 0.015);
+
+      osc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+  }
+
+  function sequenceTrack() {
+      const leadNote = woodlandLead[currentChiptuneStep];
+      const bassNote = barrelBass[currentChiptuneStep];
+
+      if (leadNote && CHIPTUNE_NOTES[leadNote]) {
+          playTone(CHIPTUNE_NOTES[leadNote], 'square', noteLength * 0.75, 0.04);
+      }
+      if (bassNote && CHIPTUNE_NOTES[bassNote]) {
+          playTone(CHIPTUNE_NOTES[bassNote], 'triangle', noteLength * 1.5, 0.25);
+      }
+      currentChiptuneStep = (currentChiptuneStep + 1) % 32;
+  }
+
+  function startMusic() {
+      stopMusic();
+      currentChiptuneStep = 0;
+      chiptuneInterval = setInterval(sequenceTrack, noteLength * 1000);
+  }
+
+  function stopMusic() {
+      if (chiptuneInterval) {
+          clearInterval(chiptuneInterval);
+          chiptuneInterval = null;
+      }
+  }
+
+  // --- SOUND EFFECTS ---
+  function playJump() {
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.1);
+  }
+
+  function playHit() {
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.5);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.5);
+  }
+
+  function playCrateSpawn() {
+      if (!audioCtx) return;
+      playTone(300, 'square', 0.1, 0.05);
+  }
+
+  function playCrateBounce() {
+      if (!audioCtx) return;
+      playTone(200, 'square', 0.05, 0.05);
+  }
+
+  function playRockSpawn() {
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.2);
+  }
+
 
   // High Quality 16-Bit Environment Palette
   const C = {
@@ -209,13 +346,13 @@
       type: "ROCKFALL",
       goalY: 45, goalX: 235,
       platforms: [
-        {x1:0, y1:220, x2:320, y2:220}, // Base
+        {x1:0, y1:220, x2:320, y2:220}, 
         {x1:100, y1:215, x2:280, y2:195}, // Plat 1 (rolls left)
-        {x1:40, y1:150, x2:220, y2:175}, // Plat 2 (rolls right)
+        {x1:40, y1:150, x2:220, y2:175},  // Plat 2 (rolls right)
         {x1:100, y1:130, x2:280, y2:105}, // Plat 3 (rolls left)
-        {x1:40, y1:50, x2:240, y2:75}, // Plat 4 (rolls right)
-        {x1:10, y1:45, x2:60, y2:45}, // Rival Platform
-        {x1:220, y1:45, x2:320, y2:45} // Checkpoint
+        {x1:40, y1:50, x2:240, y2:75},    // Plat 4 (rolls right)
+        {x1:10, y1:45, x2:60, y2:45},     // Rival Platform
+        {x1:220, y1:45, x2:320, y2:45}    // Checkpoint
       ],
       ladders: [
         {x: 260, y: 197, h: 23}, // Base to Plat 1
@@ -242,6 +379,10 @@
     player = { x: 10, y: 195, vx: 0, vy: 0, w: 16, h: 16, grounded: false, climbing: false, dead: false };
     rival = { x: 25, y: 27, state: 'IDLE', timer: 80 }; 
     hazards = [];
+
+    if (audioCtx) {
+        startMusic();
+    }
   }
 
   function getPlatformY(plat, x) {
@@ -271,10 +412,12 @@
       if (rival.state === 'HE_HO') {
         hazards.push({ x: rival.x + 15, y: rival.y + 15, vx: 1.5, vy: 0, type: 'CRATE', w: 12, h: 12, bouncy: false });
         cargoLost++; 
+        playCrateSpawn();
       } else if (rival.state === 'STUMBLE') {
         let dropX = Math.max(10, Math.min(310, player.x + (Math.random()*40 - 20)));
         hazards.push({ x: dropX, y: 0, vx: 0, vy: 3.5, type: 'ROCK', w: 8, h: 8 });
         shakeY = 3; setTimeout(()=>shakeY=0, 100);
+        playRockSpawn();
       } else if (rival.state === 'LAUGH') {
         shakeX = 2; setTimeout(()=>shakeX=0, 100);
         hazards.forEach(h => {
@@ -284,6 +427,7 @@
             h.bouncy = true; 
           }
         });
+        playCrateBounce(); 
       }
       rival.state = 'IDLE';
       rival.timer = Math.max(45, 120 - (stage * 10)); 
@@ -303,6 +447,8 @@
         let landedThisFrame = false;
 
         for (let plat of currentLvl.platforms) {
+          if (plat.fake) continue;
+
           let pY = getPlatformY(plat, h.x + h.w/2);
           if (pY !== null && h.y + h.h <= pY + 8 && nextY + h.h >= pY) {
             h.y = pY - h.h;
@@ -312,6 +458,7 @@
               h.vy = -h.vy * 0.5;
               h.bouncy = false;
               landedThisFrame = false; 
+              playCrateBounce();
             } else {
               h.vy = 0;
             }
@@ -334,15 +481,14 @@
           let slope = (activePlat.y2 - activePlat.y1) / (activePlat.x2 - activePlat.x1);
           
           if (currentLvl.type === 'ROCKFALL') {
-            // High-speed zigzag rolling mechanics
             if (landedThisFrame) {
-              h.vy = -1.5; // Quick erratic bounciness on landing
+              h.vy = -1.5; 
+              playCrateBounce();
             } else {
-              h.vx += slope * 1.5; // Aggressive slope acceleration
+              h.vx += slope * 1.5; 
             }
             h.vx = Math.max(-3.0, Math.min(3.0, h.vx));
           } else {
-            // Standard momentum
             if (landedThisFrame) h.vx *= 0.4;
             if (slope === 0) {
               if (h.vx > 0) h.vx = Math.max(0, h.vx - 0.05);
@@ -423,6 +569,8 @@
       player.grounded = false;
 
       for (let plat of currentLvl.platforms) {
+        if (plat.fake) continue; 
+
         let pY = getPlatformY(plat, midX);
         if (pY !== null && player.vy >= 0 && player.y + player.h <= pY + 8 && nextY + player.h >= pY) {
           player.y = pY - player.h;
@@ -431,7 +579,6 @@
         }
       }
 
-      // Mover interactions
       for (let m of currentLvl.movers) {
         if (player.x + player.w > m.x && player.x < m.x + m.w && player.vy >= 0 && player.y + player.h <= m.y + 12 && nextY + player.h >= m.y - 12) {
           player.y = m.y - player.h;
@@ -447,6 +594,7 @@
         player.vy = -4.0;
         player.grounded = false;
         keys.a_pressed = true;
+        playJump();
       }
       if (!keys.a) keys.a_pressed = false;
 
@@ -462,7 +610,6 @@
     player.x = Math.max(0, Math.min(320 - player.w, player.x));
     if (player.y > 240) killPlayer();
 
-    // Universal Level Complete Thresholds
     let targetY = currentLvl.goalY || 45;
     let targetX = currentLvl.goalX || 200;
     if (Math.abs(player.y - targetY) < 30 && player.grounded && player.x > targetX) {
@@ -487,6 +634,8 @@
     if (player.dead) return;
     player.dead = true;
     player.vy = -4.0; 
+    playHit();
+    stopMusic();
     setTimeout(() => {
       state = 'GAMEOVER';
       msgScreen.style.display = 'flex';
@@ -496,6 +645,7 @@
   function levelComplete() {
     state = 'LEVEL_CLEAR';
     rival.state = 'IDLE'; 
+    stopMusic();
     
     setTimeout(() => {
       stage++;
@@ -519,7 +669,6 @@
   }
 
   function drawBackground() {
-    // Pixel Block Line Gradient mimicking HTML Games logic
     const bands = 16;
     const bandHeight = 240 / bands;
     for (let i = 0; i < bands; i++) {
@@ -528,7 +677,6 @@
       ctx.fillRect(0, Math.floor(i * bandHeight), 320, Math.ceil(bandHeight));
     }
 
-    // Drifting Parallax Clouds
     ctx.fillStyle = C.CLOUD;
     let cloudOffset = (frame * 0.15) % 320;
     
@@ -548,7 +696,6 @@
 
     drawBackground();
 
-    // Render Fully Shaded 16-Bit Wooden Ladders
     for (let lad of currentLvl.ladders) {
       ctx.fillStyle = C.BROWN;
       ctx.fillRect(lad.x, lad.y, 4, lad.h);
@@ -566,10 +713,8 @@
       }
     }
 
-    // Render Platforms
     for (let plat of currentLvl.platforms) {
-      // Custom solid wooden base for the Rival's platform
-      if (plat.x1 === 10 && plat.x2 === 60 && plat.y1 === 45) {
+      if (plat.x1 === 10 && plat.x2 === 60 && plat.y1 === 45 || plat.x1 === 10 && plat.x2 === 70 && plat.y1 === 45) {
         ctx.fillStyle = C.BROWN;
         ctx.fillRect(plat.x1, plat.y1, plat.x2 - plat.x1, 25);
         ctx.fillStyle = C.DARK_BROWN;
@@ -607,19 +752,19 @@
         ctx.fillRect(Math.min(plat.x1, plat.x2) + px, Math.max(plat.y1, plat.y2) + 12 + (px%10), 4, 4);
       }
 
-      ctx.strokeStyle = C.GRASS;
-      ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(plat.x1, plat.y1+1); ctx.lineTo(plat.x2, plat.y2+1); ctx.stroke();
-      ctx.strokeStyle = C.GRASS_LIGHT;
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(plat.x1, plat.y1-1); ctx.lineTo(plat.x2, plat.y2-1); ctx.stroke();
+      if (!plat.fake) {
+        ctx.strokeStyle = C.GRASS;
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(plat.x1, plat.y1+1); ctx.lineTo(plat.x2, plat.y2+1); ctx.stroke();
+        ctx.strokeStyle = C.GRASS_LIGHT;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(plat.x1, plat.y1-1); ctx.lineTo(plat.x2, plat.y2-1); ctx.stroke();
+      }
     }
 
-    // Canoe Goal Rendering
     let targetY = currentLvl.goalY || 45;
     drawMatrix(S_CANOE, 260, targetY - 10, 2, {1: C.BROWN, 2: C.BEIGE, 3: C.DIRT_DARK});
 
-    // Movers rendering
     for (let m of currentLvl.movers) {
       ctx.fillStyle = C.BROWN;
       ctx.fillRect(m.x, m.y, m.w, 8);
@@ -627,7 +772,6 @@
       ctx.fillRect(m.x, m.y-2, m.w, 4);
     }
 
-    // Rival rendering
     let p_rival = { 1: C.RED, 2: C.SKIN, 3: C.RED, 4: C.GOLD, 5: C.TEAL, 6: C.BEIGE, 7: C.GREY };
     if (rival.state === 'HE_HO') p_rival[2] = C.WHITE; 
     if (rival.state === 'STUMBLE') p_rival[6] = C.RED; 
@@ -639,13 +783,11 @@
       ctx.fillStyle = C.GOLD; ctx.font = "bold 14px Courier"; ctx.fillText("HA HA!", rival.x+20, rival.y-5);
     }
 
-    // Hazards
     for (let h of hazards) {
       if (h.type === 'CRATE') drawMatrix(S_CRATE, h.x, h.y, 2, {1: C.ORANGE, 2: C.BEIGE, 3: C.GOLD});
       if (h.type === 'ROCK') drawMatrix(S_ROCK, h.x, h.y, 2, {1: C.TEAL, 2: C.GREY, 3: C.WHITE});
     }
 
-    // Player Animation Engine
     let activePlayerSprite = S_PLAYER_WALK_1;
     if (!player.dead && player.grounded && Math.abs(player.vx) > 0.1) {
       activePlayerSprite = (Math.floor(frame / 8) % 2 === 0) ? S_PLAYER_WALK_1 : S_PLAYER_WALK_2;
@@ -708,6 +850,7 @@
         if (state === 'GAMEOVER') {
           stage = 1; 
         }
+        initAudio();
         initLevel();
         state = 'PLAYING';
         introScreen.style.display = 'none';
