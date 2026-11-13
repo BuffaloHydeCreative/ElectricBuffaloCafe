@@ -1,0 +1,2247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Scotch Pâkahatowân</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0; padding: 0; background-color: #111111; color: #ffffff;
+            font-family: 'Press Start 2P', cursive; overflow: hidden;
+            touch-action: none; display: flex; justify-content: center; align-items: center;
+            height: 100vh; width: 100vw;
+        }
+        #game-container {
+            width: 100%; height: 100%; max-width: 600px; display: flex;
+            justify-content: center; align-items: center; box-sizing: border-box;
+            padding: 10px; position: relative;
+        }
+        canvas {
+            width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated;
+            background-color: #0E2A1E; border: 4px solid #FB6604;
+            border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            aspect-ratio: 3 / 2;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const offCanvas = document.createElement('canvas');
+        const offCtx = offCanvas.getContext('2d');
+
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        document.addEventListener('touchstart', initAudio, { once: true });
+        document.addEventListener('mousedown', initAudio, { once: true });
+
+        function playSynth(type, freqStart, freqEnd, duration, vol) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freqStart, audioCtx.currentTime);
+            if (freqEnd) osc.frequency.exponentialRampToValueAtTime(freqEnd, audioCtx.currentTime + duration);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playSinkJingle() {
+            if (!audioCtx) return;
+            const notes = [523.25, 659.25, 783.99, 1046.50]; 
+            notes.forEach((freq, idx) => {
+                setTimeout(() => { playSynth('triangle', freq, freq * 1.02, 0.25, 0.4); }, idx * 100);
+            });
+        }
+
+        const PALETTE = {
+            // Woodland Palette (Locked)
+            ROUGH_WOOD: '#0E2A1E',
+            FAIRWAY_WOOD: '#3D5948',
+            PINE_TRUNK: '#3a2311', PINE_LEAF: '#0a1f16', BIRCH_TRUNK: '#e0e0e0',
+            BIRCH_MARK: '#111111', BIRCH_LEAF: '#4E9E5E',
+
+            // Prairie Portage Palette (Locked)
+            ROUGH_PRAIRIE: '#826e2e',
+            ROUGH_PRAIRIE_DARK: '#6b5820',
+            ROUGH_PRAIRIE_TALL: '#9c8438',
+            FAIRWAY_PRAIRIE: '#476337',
+            WATER_SILT: '#5e4324', WATER_SILT_LIGHT: '#785732',
+            BUFFALO_DARK: '#2e1c0c', BUFFALO_BODY: '#452c15', BUFFALO_HORN: '#e3dfd3',
+
+            // Northern Sky Palette (Twilight Lavender / Pale Blue Rocky Mountain Pass & Aurora)
+            ROUGH_NORTH: '#272a4d',
+            ROUGH_NORTH_DARK: '#1b1d38',
+            ROUGH_NORTH_LAV: '#3b4070',
+            PEBBLE_BUFFER: '#575e91',
+            PEBBLE_SPECK: '#8f98d4',
+            FAIRWAY_NORTH: '#2b5e56',
+            GREEN_NORTH: '#88cc44',
+            GREEN_NORTH_DARK: '#72b334',
+            SAND_NORTH: '#dce4f5',
+            SAND_NORTH_DARK: '#9aa8cc',
+            WATER_GLACIAL: '#1878a8',
+            WATER_GLACIAL_LIGHT: '#4ac7eb',
+            WATER_GLACIAL_FOAM: '#c4f5ff',
+            AURORA_MINT: '#52f2b2',
+            AURORA_VIOLET: '#a878ff',
+            MTN_BASE: '#1f2240',
+            MTN_MID: '#4d548c',
+            MTN_HIGH: '#7c86c7',
+            MTN_SNOW: '#c8d2fa',
+
+            // Shared / UI Palette
+            GREEN: '#A8D038', GREEN_DARK: '#9EC62E',
+            SAND: '#D4D0C5', SAND_DARK: '#F7C844',
+            WATER_BLUE: '#0F6F9E', WATER_BLUE_LIGHT: '#12AEA2',
+            CANYON: '#540E11', UI_ORANGE: '#FB6604', WHITE: '#ffffff', BLACK: '#000000',
+            RED: '#AD1C21', TEE_BLUE: '#0F6F9E', TEE_BLUE_LIGHT: '#12AEA2',
+            YELLOW: '#F7C844'
+        };
+
+        const CLUBS = [
+            { name: "1W (DRIVER)", dist: 240, vZ: 3.5, speed: 7.5, roll: 0.96 },
+            { name: "5I (IRON)",   dist: 165, vZ: 5.0, speed: 4.8, roll: 0.90 },
+            { name: "PW (WEDGE)",  dist: 100, vZ: 6.8, speed: 2.6, roll: 0.70 },
+            { name: "PT (PUTTER)", dist: 40,  vZ: 0.0, speed: 2.2, roll: 0.95 }
+        ];
+        const GRAVITY = 0.28;
+
+        // COURSE 1: WOODLAND (Locked & Preserved)
+        const HOLES_WOODLAND = [
+            { 
+                par: 4, worldW: 600, worldH: 740,
+                tee: { x: 230, y: 660 }, pin: { x: 440, y: 125 },
+                startAngle: -Math.PI / 2,
+                shapes: [
+                    { type: 'FAIRWAY', x: 180, y: 390, w: 100, h: 290 },
+                    { type: 'FAIRWAY', x: 180, y: 220, w: 170, h: 200 },
+                    { type: 'FAIRWAY', x: 320, y: 100, w: 180, h: 140 },
+                    { type: 'SAND',    x: 310, y: 340, w: 44,  h: 44  },
+                    { type: 'SAND',    x: 320, y: 330, w: 24,  h: 64  },
+                    { type: 'GREEN',   x: 390, y: 85,  w: 100, h: 80  },
+                    { type: 'GREEN',   x: 400, y: 75,  w: 80,  h: 100 }
+                ]
+            },
+            { 
+                par: 5, worldW: 600, worldH: 740,
+                tee: { x: 100, y: 680 }, pin: { x: 140, y: 100 },
+                startAngle: 0,
+                shapes: [
+                    { type: 'FAIRWAY', x: 70,  y: 630, w: 390, h: 80 },
+                    { type: 'FAIRWAY', x: 360, y: 360, w: 100, h: 290 },
+                    { type: 'WATER',   x: 0,   y: 310, w: 600, h: 60 },
+                    { type: 'FAIRWAY', x: 100, y: 200, w: 360, h: 120 },
+                    { type: 'FAIRWAY', x: 100, y: 90,  w: 100, h: 130 },
+                    { type: 'GREEN',   x: 100, y: 60,  w: 80,  h: 80  },
+                    { type: 'GREEN',   x: 110, y: 50,  w: 60,  h: 100 }
+                ]
+            },
+            { 
+                par: 3, worldW: 600, worldH: 400,
+                tee: { x: 300, y: 330 }, pin: { x: 300, y: 150 },
+                startAngle: -Math.PI / 2,
+                shapes: [
+                    { type: 'FAIRWAY', x: 260, y: 300, w: 80,  h: 80 },
+                    { type: 'WATER',  x: 0,   y: 0,   w: 600, h: 55 },
+                    { type: 'SAND',   x: 210, y: 80,  w: 35,  h: 35 },
+                    { type: 'SAND',   x: 355, y: 80,  w: 35,  h: 35 },
+                    { type: 'SAND',   x: 210, y: 185, w: 35,  h: 35 },
+                    { type: 'SAND',   x: 355, y: 185, w: 35,  h: 35 },
+                    { type: 'GREEN',  x: 240, y: 110, w: 120, h: 80 },
+                    { type: 'GREEN',  x: 250, y: 100, w: 100, h: 100 }
+                ]
+            }
+        ];
+
+        // COURSE 2: PRAIRIE PORTAGE (Locked & Preserved)
+        const HOLES_PRAIRIE = [
+            { 
+                par: 5, worldW: 600, worldH: 1080,
+                tee: { x: 435, y: 1000 }, 
+                pin: { x: 155, y: 95 },
+                startAngle: -Math.PI / 2,
+                shapes: [
+                    { type: 'WATER', x: 265, y: 240, w: 70,  h: 840 },
+                    { type: 'WATER', x: 0,   y: 520, w: 265, h: 45 },
+                    { type: 'WATER', x: 265, y: 170, w: 215, h: 70 },
+                    { type: 'WATER', x: 415, y: 60,  w: 65,  h: 110 },
+                    { type: 'WATER', x: 265, y: 0,   w: 215, h: 60 },
+                    { type: 'WATER', x: 475, y: 205, w: 95,  h: 32 },
+                    { type: 'WATER', x: 538, y: 205, w: 32,  h: 875 },
+
+                    { type: 'FAIRWAY', x: 350, y: 720, w: 168, h: 310 },
+                    { type: 'FAIRWAY', x: 350, y: 380, w: 168, h: 340 },
+                    { type: 'FAIRWAY', x: 350, y: 260, w: 168, h: 120 },
+
+                    { type: 'FAIRWAY', x: 95,  y: 620, w: 135, h: 250 },
+                    { type: 'FAIRWAY', x: 95,  y: 260, w: 135, h: 220 },
+                    { type: 'FAIRWAY', x: 95,  y: 60,  w: 135, h: 200 },
+
+                    { type: 'FAIRWAY', x: 190, y: 72,  w: 210, h: 86 },
+
+                    { type: 'SAND',    x: 60,  y: 150, w: 35,  h: 65 },
+
+                    { type: 'GREEN',   x: 110, y: 55,  w: 90,  h: 80 },
+                    { type: 'GREEN',   x: 120, y: 45,  w: 70,  h: 100 }
+                ]
+            },
+            { 
+                par: 3, worldW: 600, worldH: 400,
+                tee: { x: 455, y: 322 }, pin: { x: 195, y: 135 },
+                startAngle: -2.45,
+                shapes: [
+                    { type: 'FAIRWAY', x: 410, y: 285, w: 90,  h: 75 },
+                    { type: 'FAIRWAY', x: 145, y: 175, w: 125, h: 85 },
+                    { type: 'GREEN',   x: 145, y: 95,  w: 100, h: 80 },
+                    { type: 'GREEN',   x: 155, y: 85,  w: 80,  h: 100 }
+                ]
+            },
+            { 
+                par: 4, worldW: 600, worldH: 740,
+                tee: { x: 300, y: 660 }, pin: { x: 300, y: 90 },
+                startAngle: -Math.PI / 2,
+                shapes: [
+                    { type: 'FAIRWAY', x: 230, y: 580, w: 140, h: 120 },
+                    { type: 'FAIRWAY', x: 155, y: 170, w: 105, h: 420 },
+                    { type: 'FAIRWAY', x: 340, y: 170, w: 105, h: 420 },
+                    { type: 'SAND',    x: 105, y: 310, w: 45,  h: 90 },
+                    { type: 'SAND',    x: 450, y: 310, w: 45,  h: 90 },
+                    { type: 'FAIRWAY', x: 200, y: 130, w: 200, h: 70 },
+                    { type: 'GREEN',   x: 250, y: 50,  w: 100, h: 80 },
+                    { type: 'GREEN',   x: 260, y: 40,  w: 80,  h: 100 }
+                ]
+            }
+        ];
+
+        // COURSE 3: NORTHERN SKY (Rocky Mountain Pass Under the Northern Lights)
+        const HOLES_NORTHERN = [
+            { // Hole 1: Par 3 — Island Tee Box across Pristine Glacial Lake to Green Island (with Short Fairway)
+                par: 3, worldW: 600, worldH: 400,
+                tee: { x: 300, y: 325 }, pin: { x: 300, y: 126 },
+                startAngle: -Math.PI / 2,
+                shapes: [
+                    { type: 'WATER',        x: 55,  y: 36,  w: 490, h: 334 },
+                    { type: 'PEBBLE_ROUGH', x: 238, y: 288, w: 124, h: 66  },
+                    { type: 'FAIRWAY',      x: 248, y: 296, w: 104, h: 52  },
+                    { type: 'PEBBLE_ROUGH', x: 224, y: 78,  w: 152, h: 142 },
+                    { type: 'FAIRWAY',      x: 236, y: 158, w: 128, h: 52  },
+                    { type: 'GREEN',        x: 236, y: 94,  w: 128, h: 72  },
+                    { type: 'GREEN',        x: 246, y: 86,  w: 108, h: 88  }
+                ]
+            },
+            { // Hole 2: Par 4 — Two-Frame Horseshoe around Impassable Vertical Rocky Ridge
+                par: 4, worldW: 600, worldH: 740,
+                tee: { x: 145, y: 625 }, pin: { x: 455, y: 580 },
+                startAngle: -Math.PI / 2,
+                shapes: [
+                    { type: 'HAZARD_ROCK',  x: 0,   y: 0,   w: 600, h: 740 },
+                    { type: 'MOUNTAIN',     x: 0,   y: 0,   w: 600, h: 175 },
+                    { type: 'PEBBLE_ROUGH', x: 64,  y: 192, w: 162, h: 488 },
+                    { type: 'PEBBLE_ROUGH', x: 64,  y: 192, w: 472, h: 158 },
+                    { type: 'PEBBLE_ROUGH', x: 374, y: 192, w: 162, h: 472 },
+                    { type: 'FAIRWAY',      x: 92,  y: 222, w: 106, h: 438 },
+                    { type: 'FAIRWAY',      x: 92,  y: 222, w: 416, h: 102 },
+                    { type: 'FAIRWAY',      x: 402, y: 222, w: 106, h: 418 },
+                    { type: 'RIDGE',        x: 230, y: 350, w: 140, h: 390 },
+                    { type: 'SAND',         x: 265, y: 196, w: 70,  h: 24 },
+                    { type: 'GREEN',        x: 405, y: 540, w: 100, h: 80 },
+                    { type: 'GREEN',        x: 415, y: 530, w: 80,  h: 100 }
+                ]
+            },
+            { // Hole 3: Par 5 — 3-Frame Slight Dogleg Right with Clean Glacial River & Cascading Waterfall Beside Green
+                par: 5, worldW: 600, worldH: 1080,
+                tee: { x: 205, y: 1000 }, pin: { x: 295, y: 102 },
+                startAngle: -Math.PI / 2,
+                shapes: [
+                    { type: 'MOUNTAIN',  x: 440, y: 0,   w: 160, h: 205 },
+                    { type: 'WATERFALL', x: 465, y: 36,  w: 80,  h: 174 },
+                    { type: 'WATER',     x: 0,   y: 205, w: 600, h: 52 },
+                    { type: 'FAIRWAY',   x: 145, y: 680, w: 120, h: 350 },
+                    { type: 'FAIRWAY',   x: 165, y: 500, w: 145, h: 200 },
+                    { type: 'FAIRWAY',   x: 225, y: 278, w: 155, h: 242 },
+                    { type: 'SAND',      x: 385, y: 470, w: 38,  h: 65 },
+                    { type: 'FAIRWAY',   x: 230, y: 58,  w: 140, h: 126 },
+                    { type: 'SAND',      x: 190, y: 80,  w: 35,  h: 65 },
+                    { type: 'GREEN',     x: 245, y: 58,  w: 100, h: 80 },
+                    { type: 'GREEN',     x: 255, y: 48,  w: 80,  h: 100 }
+                ]
+            }
+        ];
+
+        let selectedCourseIdx = 0;
+        let activeCourseHoles = HOLES_WOODLAND;
+
+        let currentHole = 0;
+        let strokes = 0;
+        let courseScores = [0, 0, 0];
+        let lie = 'TEE';
+        let ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, prevX: 0, prevY: 0 };
+        let aimAngle = -Math.PI / 2;
+        let clubIdx = 0;
+        let shotFeedback = "";
+
+        let camY = 0;
+        let targetCamY = 0;
+        let showMiniMap = false;
+
+        let sessionConditions = { speed: 0, dirAngle: 0, dirName: '', puttingFriction: 0.915 };
+        let assignedDualSlopeHoles = [];
+        let buffalos = [];
+
+        let puttingState = {
+            active: false,
+            cupX: 300, cupY: 160, cupRadius: 9, zoomScale: 2.2,
+            isDualSlope: false,
+            splitAxis: 'x', splitVal: 300,
+            slope1: { x: 0, y: 0 }, slope2: { x: 0, y: 0 }
+        };
+
+        let state = 'TITLE';
+        const COURSES = [
+            { 
+                name: "WOODLAND", 
+                desc: "LAKE OF THE WOODS", 
+                status: "AVAILABLE", 
+                cond: "",
+                windChance: "AVG",
+                greens: "SLOW",
+                holes: HOLES_WOODLAND
+            },
+            { 
+                name: "PRAIRIE PORTAGE", 
+                desc: "RED RIVER VALLEY", 
+                status: "AVAILABLE", 
+                cond: "",
+                windChance: "HIGH",
+                greens: "AVG",
+                holes: HOLES_PRAIRIE
+            },
+            { 
+                name: "NORTHERN SKY", 
+                desc: "ROCKY MTN PASS", 
+                status: "AVAILABLE", 
+                cond: "",
+                windChance: "LOW",
+                greens: "FAST",
+                holes: HOLES_NORTHERN
+            }
+        ];
+
+        let meter = { val: 0, dir: 0.8, power: 0, accuracy: 0, powerMarker: -1, accuracyMarker: -1 };
+        let dpad = { left: false, right: false, up: false, down: false };
+        let inputTimers = { up: 0, down: 0 };
+
+        function initGlobalConditions() {
+            let r = Math.random();
+            let windSpd = 0;
+
+            if (selectedCourseIdx === 0) { 
+                if (r < 0.60) windSpd = Math.floor(Math.random() * 11);
+                else if (r < 0.85) windSpd = 11 + Math.floor(Math.random() * 10);
+                else if (r < 0.95) windSpd = 21 + Math.floor(Math.random() * 10);
+                else windSpd = 31 + Math.floor(Math.random() * 5);
+                sessionConditions.puttingFriction = 0.915; 
+                assignedDualSlopeHoles = [Math.floor(Math.random() * 3)];
+            } else if (selectedCourseIdx === 1) { 
+                if (r < 0.20) windSpd = Math.floor(Math.random() * 11);
+                else if (r < 0.50) windSpd = 11 + Math.floor(Math.random() * 10);
+                else if (r < 0.85) windSpd = 21 + Math.floor(Math.random() * 10);
+                else windSpd = 31 + Math.floor(Math.random() * 6);
+                sessionConditions.puttingFriction = 0.930;
+                let h1 = Math.floor(Math.random() * 3);
+                let h2 = (h1 + 1 + Math.floor(Math.random() * 2)) % 3;
+                assignedDualSlopeHoles = [h1, h2];
+            } else if (selectedCourseIdx === 2) { 
+                if (r < 0.75) windSpd = Math.floor(Math.random() * 9);
+                else if (r < 0.95) windSpd = 9 + Math.floor(Math.random() * 7);
+                else windSpd = 16 + Math.floor(Math.random() * 6);
+                sessionConditions.puttingFriction = 0.946;
+                assignedDualSlopeHoles = [0, 1, 2];
+            }
+
+            const dirs = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
+            let dirIdx = Math.floor(Math.random() * 8);
+            
+            sessionConditions.speed = windSpd;
+            sessionConditions.dirName = dirs[dirIdx];
+            sessionConditions.dirAngle = dirIdx * (Math.PI / 4);
+
+            COURSES[selectedCourseIdx].cond = `GREENS: ${COURSES[selectedCourseIdx].greens} | WIND: ${windSpd}KM/H ${sessionConditions.dirName}`;
+        }
+        initGlobalConditions();
+
+        function spawnBuffaloHerd() {
+            buffalos = [];
+            for (let i = 0; i < 9; i++) {
+                buffalos.push({
+                    x: 280 + (i % 3) * 40 + Math.random() * 16,
+                    y: 205 + Math.floor(i / 3) * 42 + Math.random() * 16,
+                    vx: (Math.random() - 0.5) * 0.22,
+                    vy: (Math.random() - 0.5) * 0.16,
+                    chewAnim: Math.random() * 100,
+                    size: 14
+                });
+            }
+        }
+
+        function drawTreeToContext(targetCtx, x, y, type) {
+            if (type === 'PINE') {
+                targetCtx.fillStyle = PALETTE.PINE_TRUNK; targetCtx.fillRect(x + 10, y + 20, 4, 10);
+                targetCtx.fillStyle = PALETTE.PINE_LEAF; targetCtx.fillRect(x + 2, y + 12, 20, 10);
+                targetCtx.fillRect(x + 6, y + 4, 12, 12); targetCtx.fillRect(x + 10, y - 4, 4, 12);
+            } else if (type === 'BIRCH') {
+                targetCtx.fillStyle = PALETTE.BIRCH_TRUNK; targetCtx.fillRect(x + 10, y + 10, 4, 20);
+                targetCtx.fillStyle = PALETTE.BIRCH_MARK; targetCtx.fillRect(x + 10, y + 14, 2, 2); targetCtx.fillRect(x + 12, y + 22, 2, 2);
+                targetCtx.fillStyle = PALETTE.BIRCH_LEAF; targetCtx.fillRect(x, y - 2, 24, 16); targetCtx.fillRect(x + 4, y - 8, 16, 10);
+            } else if (type === 'SNOW_PINE') {
+                targetCtx.fillStyle = '#14172b'; targetCtx.fillRect(x + 10, y + 20, 4, 10);
+                targetCtx.fillStyle = '#192942'; targetCtx.fillRect(x + 2, y + 12, 20, 10);
+                targetCtx.fillRect(x + 6, y + 4, 12, 12); targetCtx.fillRect(x + 10, y - 4, 4, 12);
+                targetCtx.fillStyle = PALETTE.MTN_SNOW;
+                targetCtx.fillRect(x + 10, y - 4, 4, 3);
+                targetCtx.fillRect(x + 6, y + 4, 6, 2);
+                targetCtx.fillRect(x + 3, y + 12, 8, 2);
+            }
+        }
+
+        function drawTree(x, y, type) {
+            drawTreeToContext(offCtx, x, y, type);
+        }
+
+        function drawSteppedMountainBlock(targetCtx, x, y, w, h, isVerticalRidge) {
+            targetCtx.fillStyle = PALETTE.MTN_BASE;
+            targetCtx.fillRect(x, y, w, h);
+
+            targetCtx.fillStyle = PALETTE.MTN_MID;
+            targetCtx.fillRect(x + 6, y + 6, Math.max(4, w - 12), Math.max(4, h - 14));
+
+            targetCtx.fillStyle = PALETTE.MTN_HIGH;
+            if (isVerticalRidge) {
+                targetCtx.fillRect(x + 16, y + 12, Math.max(4, w - 32), Math.max(4, h - 24));
+                targetCtx.fillStyle = PALETTE.MTN_SNOW;
+                let spineX = x + Math.floor(w / 2) - 6;
+                for (let sy = y + 18; sy < y + h - 22; sy += 24) {
+                    targetCtx.fillRect(spineX, sy, 12, 14);
+                    targetCtx.fillRect(spineX - 4, sy + 4, 20, 6);
+                }
+            } else {
+                targetCtx.fillRect(x + 10, y + 8, Math.max(4, w - 20), Math.max(4, h - 38));
+                targetCtx.fillStyle = PALETTE.MTN_SNOW;
+                for (let px = x + 20; px < x + w - 40; px += 68) {
+                    targetCtx.fillRect(px + 14, y + 6, 16, 12);
+                    targetCtx.fillRect(px + 8,  y + 18, 28, 12);
+                    targetCtx.fillRect(px + 2,  y + 30, 40, 10);
+                }
+                targetCtx.fillStyle = PALETTE.MTN_BASE;
+                for (let sx = x + 16; sx < x + w - 16; sx += 22) {
+                    targetCtx.fillRect(sx, y + 48, 4, Math.max(10, h - 64));
+                }
+            }
+        }
+
+        function drawLandShapeToContext(targetCtx, s, isPrairie, isNorthern) {
+            if (s.type === 'MOUNTAIN') {
+                drawSteppedMountainBlock(targetCtx, s.x, s.y, s.w, s.h, false);
+                return;
+            }
+            if (s.type === 'RIDGE') {
+                drawSteppedMountainBlock(targetCtx, s.x, s.y, s.w, s.h, true);
+                return;
+            }
+            if (s.type === 'PEBBLE_ROUGH') {
+                targetCtx.fillStyle = PALETTE.PEBBLE_BUFFER;
+                targetCtx.fillRect(s.x, s.y, s.w, s.h);
+                targetCtx.fillStyle = PALETTE.PEBBLE_SPECK;
+                for (let px = s.x + 4; px < s.x + s.w - 4; px += 12) {
+                    for (let py = s.y + 4; py < s.y + s.h - 4; py += 10) {
+                        let shift = ((py / 10) % 2 === 0) ? 0 : 5;
+                        if (px + shift < s.x + s.w - 4) {
+                            targetCtx.fillRect(px + shift, py, 3, 3);
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (s.type === 'FAIRWAY') {
+                targetCtx.fillStyle = isPrairie ? PALETTE.FAIRWAY_PRAIRIE : (isNorthern ? PALETTE.FAIRWAY_NORTH : PALETTE.FAIRWAY_WOOD);
+            } else if (s.type === 'SAND') {
+                targetCtx.fillStyle = isNorthern ? PALETTE.SAND_NORTH : PALETTE.SAND;
+            } else if (s.type === 'GREEN') {
+                targetCtx.fillStyle = isNorthern ? PALETTE.GREEN_NORTH : PALETTE.GREEN;
+            } else {
+                targetCtx.fillStyle = PALETTE[s.type];
+            }
+            
+            targetCtx.fillRect(s.x, s.y, s.w, s.h);
+
+            if (s.type === 'SAND') {
+                targetCtx.fillStyle = isNorthern ? PALETTE.SAND_NORTH_DARK : PALETTE.SAND_DARK;
+                for (let sx = s.x + 4; sx < s.x + s.w - 6; sx += 12) {
+                    for (let sy = s.y + 4; sy < s.y + s.h - 4; sy += 10) {
+                        let shift = ((sy / 10) % 2 === 0) ? 0 : 5;
+                        if (sx + shift < s.x + s.w - 6) {
+                            targetCtx.fillRect(sx + shift, sy, 5, 3);
+                        }
+                    }
+                }
+            }
+            if (s.type === 'GREEN') {
+                targetCtx.fillStyle = isNorthern ? PALETTE.GREEN_NORTH_DARK : PALETTE.GREEN_DARK;
+                for (let gx = s.x + 4; gx < s.x + s.w - 4; gx += 12) {
+                    for (let gy = s.y + 4; gy < s.y + s.h - 4; gy += 12) {
+                        let shift = ((gy / 12) % 2 === 0) ? 0 : 6;
+                        if (gx + shift < s.x + s.w - 4) {
+                            targetCtx.fillRect(gx + shift, gy, 4, 4);
+                        }
+                    }
+                }
+            }
+        }
+
+        function bakeTerrain() {
+            const hole = activeCourseHoles[currentHole];
+            offCanvas.width = hole.worldW; offCanvas.height = hole.worldH;
+
+            const isPrairie = (selectedCourseIdx === 1);
+            const isNorthern = (selectedCourseIdx === 2);
+
+            if (isNorthern) {
+                offCtx.fillStyle = PALETTE.ROUGH_NORTH;
+                offCtx.fillRect(0, 0, hole.worldW, hole.worldH);
+
+                offCtx.fillStyle = PALETTE.ROUGH_NORTH_LAV;
+                for (let i = 0; i < (hole.worldW * hole.worldH) / 1400; i++) {
+                    let rx = Math.floor(Math.random() * (hole.worldW / 8)) * 8;
+                    let ry = Math.floor(Math.random() * (hole.worldH / 8)) * 8;
+                    offCtx.fillRect(rx, ry, 16, 8);
+                }
+                offCtx.fillStyle = PALETTE.ROUGH_NORTH_DARK;
+                for (let i = 0; i < (hole.worldW * hole.worldH) / 1200; i++) {
+                    let rx = Math.floor(Math.random() * (hole.worldW / 4)) * 4;
+                    let ry = Math.floor(Math.random() * (hole.worldH / 4)) * 4;
+                    offCtx.fillRect(rx, ry, 8, 8);
+                }
+
+                for (let ay = 40; ay < hole.worldH; ay += 140) {
+                    offCtx.fillStyle = 'rgba(82, 242, 178, 0.09)';
+                    offCtx.fillRect(0, ay, hole.worldW, 24);
+                    offCtx.fillStyle = 'rgba(168, 120, 255, 0.08)';
+                    offCtx.fillRect(0, ay + 24, hole.worldW, 18);
+                }
+                for (let i = 0; i < (hole.worldW * hole.worldH) / 3200; i++) {
+                    offCtx.fillStyle = (i % 3 === 0) ? 'rgba(255, 255, 255, 0.45)' : 'rgba(158, 168, 224, 0.35)';
+                    offCtx.fillRect(Math.random() * hole.worldW, Math.random() * hole.worldH, 2, 2);
+                }
+            } else if (isPrairie) {
+                offCtx.fillStyle = PALETTE.ROUGH_PRAIRIE;
+                offCtx.fillRect(0, 0, hole.worldW, hole.worldH);
+                offCtx.fillStyle = PALETTE.ROUGH_PRAIRIE_DARK;
+                for (let i = 0; i < (hole.worldW * hole.worldH) / 75; i++) {
+                    offCtx.fillRect(Math.random() * hole.worldW, Math.random() * hole.worldH, 2, 8);
+                }
+                offCtx.fillStyle = PALETTE.ROUGH_PRAIRIE_TALL;
+                for (let i = 0; i < (hole.worldW * hole.worldH) / 90; i++) {
+                    offCtx.fillRect(Math.random() * hole.worldW, Math.random() * hole.worldH, 3, 5);
+                }
+            } else {
+                offCtx.fillStyle = PALETTE.ROUGH_WOOD;
+                offCtx.fillRect(0, 0, hole.worldW, hole.worldH);
+                offCtx.fillStyle = '#0a1f16';
+                for (let i = 0; i < (hole.worldW * hole.worldH) / 100; i++) { offCtx.fillRect(Math.random() * hole.worldW, Math.random() * hole.worldH, 2, 6); }
+                offCtx.fillStyle = '#1b402c'; 
+                for (let i = 0; i < (hole.worldW * hole.worldH) / 100; i++) { offCtx.fillRect(Math.random() * hole.worldW, Math.random() * hole.worldH, 2, 4); }
+            }
+
+            for (let s of hole.shapes) {
+                if (s.type === 'WATER' || s.type === 'WATERFALL' || s.type === 'HAZARD_ROCK') continue;
+                drawLandShapeToContext(offCtx, s, isPrairie, isNorthern);
+            }
+
+            if (!isPrairie) {
+                let treeCount = isNorthern ? (hole.worldH > 400 ? 220 : 95) : (hole.worldH > 400 ? 380 : 180);
+                for (let i = 0; i < treeCount; i++) {
+                    let tx = Math.random() * hole.worldW; let ty = Math.random() * hole.worldH;
+                    let canSpawn = true;
+                    if (Math.hypot(tx - hole.tee.x, ty - hole.tee.y) < 65) canSpawn = false;
+                    for (let s of hole.shapes) {
+                        if (s.type === 'HAZARD_ROCK') continue;
+                        let buf = (s.type === 'MOUNTAIN' || s.type === 'RIDGE') ? 8 : 32;
+                        if (tx >= s.x - buf && tx <= s.x + s.w + buf && ty >= s.y - buf && ty <= s.y + s.h + buf) {
+                            canSpawn = false; break;
+                        }
+                    }
+                    if (canSpawn) {
+                        if (isNorthern) drawTree(tx, ty, 'SNOW_PINE');
+                        else drawTree(tx, ty, Math.random() > 0.4 ? 'PINE' : 'BIRCH');
+                    }
+                }
+            }
+        }
+
+        function loadHole(idx) {
+            currentHole = idx; strokes = 0; lie = 'TEE'; clubIdx = 0;
+            const hole = activeCourseHoles[idx];
+
+            ball.x = hole.tee.x; ball.y = hole.tee.y; ball.z = 0;
+            ball.prevX = ball.x; ball.prevY = ball.y;
+            aimAngle = hole.startAngle !== undefined ? hole.startAngle : -Math.PI / 2; 
+
+            state = 'AIM'; shotFeedback = ""; puttingState.active = false;
+            meter.powerMarker = -1; meter.accuracyMarker = -1;
+            
+            if (hole.worldH > 400) {
+                let projY = Math.max(0, Math.min(hole.worldH, ball.y + Math.sin(aimAngle) * CLUBS[clubIdx].dist));
+                targetCamY = getTargetCameraY(hole, projY);
+            } else {
+                targetCamY = 0;
+            }
+            camY = targetCamY;
+
+            if (selectedCourseIdx === 1 && currentHole === 1) {
+                spawnBuffaloHerd();
+            }
+
+            bakeTerrain();
+        }
+
+        function getTerrainAt(x, y) {
+            const hole = activeCourseHoles[currentHole];
+            if (x < 0 || x >= hole.worldW || y < 0 || y >= hole.worldH) return 'OB';
+            for (let i = hole.shapes.length - 1; i >= 0; i--) {
+                const s = hole.shapes[i];
+                if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) {
+                    if (s.type === 'PEBBLE_ROUGH') return 'ROUGH';
+                    if (s.type === 'WATERFALL') return 'WATER';
+                    if (s.type === 'MOUNTAIN' || s.type === 'RIDGE' || s.type === 'HAZARD_ROCK') return 'OB';
+                    return s.type; 
+                }
+            }
+            return 'ROUGH';
+        }
+
+        function handleA_Button() {
+            initAudio();
+            if (state === 'TITLE') { 
+                state = 'COURSE_SELECT'; playSynth('triangle', 350, 450, 0.1, 0.3); 
+            } 
+            else if (state === 'COURSE_SELECT') {
+                if (COURSES[selectedCourseIdx].status === 'AVAILABLE') { 
+                    courseScores = [0, 0, 0];
+                    activeCourseHoles = COURSES[selectedCourseIdx].holes;
+                    initGlobalConditions();
+                    playSynth('triangle', 440, 660, 0.15, 0.4); 
+                    state = 'COURSE_SPLASH';
+                } 
+                else playSynth('triangle', 150, 90, 0.25, 0.5); 
+            }
+            else if (state === 'COURSE_SPLASH') {
+                playSynth('triangle', 523.25, 783.99, 0.18, 0.4);
+                loadHole(0);
+            }
+            else if (state === 'POST_HOLE') {
+                if (currentHole < 2) {
+                    loadHole(currentHole + 1);
+                } else {
+                    state = 'FINAL_SCORECARD';
+                    playSynth('triangle', 523.25, 659.25, 0.25, 0.4);
+                }
+            } 
+            else if (state === 'FINAL_SCORECARD') {
+                state = 'COURSE_SELECT';
+                currentHole = 0;
+                initGlobalConditions();
+                playSynth('triangle', 350, 450, 0.1, 0.3);
+            }
+            else if (state === 'AIM') {
+                state = 'POWER'; meter.val = 0; meter.dir = 0.81; shotFeedback = "";
+                playSynth('triangle', 300, 400, 0.1, 0.2);
+            } 
+            else if (state === 'POWER') {
+                meter.power = meter.val; meter.powerMarker = meter.val; state = 'SNAP'; meter.dir = -1.69; 
+                playSynth('triangle', 400, 500, 0.1, 0.2);
+            } 
+            else if (state === 'SNAP') {
+                meter.accuracy = meter.val; meter.accuracyMarker = meter.val; hitBall();
+            }
+        }
+
+        function handleB_Button() {
+            if (state === 'COURSE_SELECT') { 
+                state = 'TITLE'; playSynth('triangle', 300, 200, 0.1, 0.3); 
+            }
+            else if (state === 'COURSE_SPLASH') {
+                state = 'COURSE_SELECT'; playSynth('triangle', 300, 200, 0.1, 0.3);
+            }
+            else if (state === 'AIM' || state === 'FLY' || state === 'ROLL') { 
+                showMiniMap = !showMiniMap; playSynth('triangle', 450, 450, 0.05, 0.2); 
+            }
+        }
+
+        function hitBall() {
+            strokes++; 
+            courseScores[currentHole] = strokes;
+            state = 'FLY'; let club = CLUBS[clubIdx];
+
+            let sweetCenter = 25; 
+            let deviation = (meter.accuracy - sweetCenter) / 100;
+            let finalAngle = aimAngle + (deviation * 0.9);
+
+            let missDiff = Math.abs(meter.accuracy - sweetCenter);
+            if (missDiff <= 5) shotFeedback = "GREAT SHOT!";
+            else if (missDiff <= 13) shotFeedback = "AVERAGE";
+            else shotFeedback = "POOR SHOT!";
+
+            let pwr = Math.max(0.05, meter.power / 100);
+
+            if (puttingState.active) {
+                let puttForce = pwr * 8.5;
+                ball.vx = Math.cos(finalAngle) * puttForce;
+                ball.vy = Math.sin(finalAngle) * puttForce;
+                ball.vz = 0; state = 'ROLL';
+                playSynth('square', 100, 60, 0.15, 0.6);
+                return;
+            }
+
+            let liePenalty = 1.0; let zPenalty = 1.0;
+            if (lie === 'ROUGH') {
+                if (clubIdx === 0) { liePenalty = 0.35; zPenalty = 0.35; } else liePenalty = 0.75;
+            } else if (lie === 'SAND') {
+                if (clubIdx === 0) { liePenalty = 0.20; zPenalty = 0.20; }
+                else if (clubIdx === 1) { liePenalty = 0.45; zPenalty = 0.45; }
+                else liePenalty = 0.75;
+            }
+
+            let speedModifier = club.speed * pwr * liePenalty;
+            ball.prevX = ball.x; ball.prevY = ball.y;
+            ball.vx = Math.cos(finalAngle) * speedModifier;
+            ball.vy = Math.sin(finalAngle) * speedModifier;
+            ball.vz = club.vZ * pwr * zPenalty;
+            if (clubIdx === 3) ball.vz = 0;
+
+            playSynth('square', 80, 40, 0.2, 0.8);
+        }
+
+        window.addEventListener('message', function(event) {
+            const cmd = event.data;
+            if (cmd === 'DPAD_UP_PRESS' || cmd === 'DPAD_UP') dpad.up = true;
+            if (cmd === 'DPAD_UP_RELEASE') dpad.up = false;
+            if (cmd === 'DPAD_DOWN_PRESS' || cmd === 'DPAD_DOWN') dpad.down = true;
+            if (cmd === 'DPAD_DOWN_RELEASE') dpad.down = false;
+            if (cmd === 'DPAD_LEFT_PRESS' || cmd === 'DPAD_LEFT') dpad.left = true;
+            if (cmd === 'DPAD_LEFT_RELEASE') dpad.left = false;
+            if (cmd === 'DPAD_RIGHT_PRESS' || cmd === 'DPAD_RIGHT') dpad.right = true;
+            if (cmd === 'DPAD_RIGHT_RELEASE') dpad.right = false;
+            if (cmd === 'BUTTON_A') handleA_Button();
+            if (cmd === 'BUTTON_B') handleB_Button();
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') dpad.up = true;
+            if (e.key === 'ArrowDown') dpad.down = true;
+            if (e.key === 'ArrowLeft') dpad.left = true;
+            if (e.key === 'ArrowRight') dpad.right = true;
+            if (e.key === 'a' || e.key === 'A' || e.key === ' ') handleA_Button();
+            if (e.key === 'b' || e.key === 'B' || e.key === 'm' || e.key === 'M') handleB_Button();
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowUp') dpad.up = false;
+            if (e.key === 'ArrowDown') dpad.down = false;
+            if (e.key === 'ArrowLeft') dpad.left = false;
+            if (e.key === 'ArrowRight') dpad.right = false;
+        });
+
+        function handleMenuNavigation(key, changeVal) {
+            let now = Date.now();
+            if (dpad[key]) {
+                if (inputTimers[key] === 0) {
+                    selectedCourseIdx = Math.max(0, Math.min(COURSES.length - 1, selectedCourseIdx + changeVal));
+                    playSynth('triangle', 240, 240, 0.05, 0.2); inputTimers[key] = now;
+                } else if (now - inputTimers[key] > 280) {
+                    selectedCourseIdx = Math.max(0, Math.min(COURSES.length - 1, selectedCourseIdx + changeVal));
+                    playSynth('triangle', 240, 240, 0.05, 0.2); inputTimers[key] = now - 180;
+                }
+            } else inputTimers[key] = 0;
+        }
+
+        function handleClubSelectionInput(key, changeVal) {
+            if (puttingState.active) return;
+            let now = Date.now();
+            if (dpad[key]) {
+                if (inputTimers[key] === 0) {
+                    clubIdx = Math.max(0, Math.min(3, clubIdx + changeVal)); inputTimers[key] = now;
+                } else if (now - inputTimers[key] > 300) {
+                    clubIdx = Math.max(0, Math.min(3, clubIdx + changeVal)); inputTimers[key] = now - 200;
+                }
+            } else inputTimers[key] = 0;
+        }
+
+        function initPuttingMiniGame() {
+            puttingState.active = true; clubIdx = 3; 
+            const hole = activeCourseHoles[currentHole];
+
+            let dx = (ball.x - hole.pin.x) * puttingState.zoomScale;
+            let dy = (ball.y - hole.pin.y) * puttingState.zoomScale;
+            ball.x = puttingState.cupX + dx;
+            ball.y = puttingState.cupY + dy;
+            ball.z = 0; ball.vx = 0; ball.vy = 0;
+
+            puttingState.isDualSlope = assignedDualSlopeHoles.includes(currentHole);
+            puttingState.splitAxis = Math.random() > 0.5 ? 'x' : 'y';
+            puttingState.splitVal = puttingState.splitAxis === 'x' ? 300 : 160;
+
+            const subtleSlope = () => {
+                let dir = Math.floor(Math.random() * 8);
+                let ang = dir * (Math.PI / 4);
+                let mag = 0.0035 + (Math.random() * 0.0025);
+                return { x: Math.cos(ang) * mag, y: Math.sin(ang) * mag };
+            };
+
+            puttingState.slope1 = subtleSlope();
+            puttingState.slope2 = subtleSlope();
+
+            aimAngle = Math.atan2(puttingState.cupY - ball.y, puttingState.cupX - ball.x);
+            state = 'AIM';
+        }
+
+        function getActiveSlope(screenX, screenY) {
+            if (!puttingState.isDualSlope) return puttingState.slope1;
+            let val = (puttingState.splitAxis === 'x') ? screenX : screenY;
+            return (val < puttingState.splitVal) ? puttingState.slope1 : puttingState.slope2;
+        }
+
+        function exitPuttingOffGreen(worldX, worldY) {
+            const hole = activeCourseHoles[currentHole];
+            ball.x = worldX; ball.y = worldY;
+            ball.vx = ball.vx / puttingState.zoomScale; 
+            ball.vy = ball.vy / puttingState.zoomScale;
+            ball.z = 0; ball.vz = 0; ball.prevX = ball.x; ball.prevY = ball.y;
+
+            puttingState.active = false;
+            targetCamY = hole.worldH > 400 ? Math.max(0, Math.min(hole.worldH - 400, ball.y - 200)) : 0;
+            camY = targetCamY;
+            
+            shotFeedback = "OFF GREEN!";
+            state = 'ROLL';
+        }
+
+        function gameLoop() {
+            update(); draw(); requestAnimationFrame(gameLoop);
+        }
+
+        function getTargetCameraY(hole, focusY) {
+            if (hole.worldH <= 400) return 0;
+            if (hole.worldH > 900) {
+                if (focusY < 370) return 0;
+                if (focusY < 710) return 340;
+                return 680;
+            } else {
+                return (focusY < (hole.worldH - 400) + 70) ? 0 : (hole.worldH - 400);
+            }
+        }
+
+        function triggerHazardReset(hole, feedbackText) {
+            strokes++;
+            courseScores[currentHole] = strokes;
+            ball.x = ball.prevX;
+            ball.y = ball.prevY;
+            ball.z = 0;
+            ball.vx = 0;
+            ball.vy = 0;
+            ball.vz = 0;
+            lie = getTerrainAt(ball.x, ball.y);
+            if (lie === 'OB' || lie === 'WATER') lie = 'FAIRWAY';
+            if (hole.worldH > 400) targetCamY = getTargetCameraY(hole, ball.y);
+            playSynth('noise', 400, 100, 0.4, 0.8);
+            shotFeedback = feedbackText || "HAZARD +1";
+            state = 'AIM';
+        }
+
+        function update() {
+            if (state === 'COURSE_SELECT' || state === 'COURSE_SPLASH' || state === 'FINAL_SCORECARD') { 
+                if (state === 'COURSE_SELECT') {
+                    handleMenuNavigation('up', -1); 
+                    handleMenuNavigation('down', 1); 
+                }
+                return; 
+            }
+
+            const hole = activeCourseHoles[currentHole];
+
+            if (selectedCourseIdx === 1 && currentHole === 1 && !puttingState.active) {
+                for (let b of buffalos) {
+                    b.chewAnim += 0.05;
+                    b.x += b.vx;
+                    b.y += b.vy;
+                    if (b.x < 275 || b.x > 395) b.vx *= -1;
+                    if (b.y < 195 || b.y > 335) b.vy *= -1;
+                }
+            }
+
+            if (state === 'AIM') {
+                if (dpad.left) aimAngle -= 0.03; if (dpad.right) aimAngle += 0.03;
+                handleClubSelectionInput('up', -1); handleClubSelectionInput('down', 1);
+
+                if (!puttingState.active && hole.worldH > 400) {
+                    let projY = Math.max(0, Math.min(hole.worldH, ball.y + Math.sin(aimAngle) * CLUBS[clubIdx].dist));
+                    targetCamY = getTargetCameraY(hole, projY);
+                }
+            }
+            else if (state === 'POWER' || state === 'SNAP') {
+                if (!puttingState.active && hole.worldH > 400) {
+                    targetCamY = getTargetCameraY(hole, ball.y);
+                }
+
+                meter.val += meter.dir;
+                if (state === 'POWER' && meter.val > 100) { meter.val = 100; meter.dir *= -1; }
+                if (state === 'SNAP' && meter.val < 0) { meter.val = 0; meter.accuracy = 0; meter.accuracyMarker = 0; hitBall(); }
+            }
+            else if (state === 'FLY' || state === 'ROLL') {
+                ball.x += ball.vx; ball.y += ball.vy;
+
+                if (!puttingState.active && hole.worldH > 400) {
+                    targetCamY = getTargetCameraY(hole, ball.y);
+                }
+
+                if (selectedCourseIdx === 1 && currentHole === 1 && !puttingState.active && ball.z < 7) {
+                    for (let b of buffalos) {
+                        if (Math.hypot(ball.x - b.x, ball.y - b.y) < 13) {
+                            ball.vx = -ball.vx * 0.45;
+                            ball.vy = -ball.vy * 0.45;
+                            ball.x += ball.vx * 2;
+                            ball.y += ball.vy * 2;
+                            ball.z = 0;
+                            state = 'ROLL';
+                            playSynth('sawtooth', 95, 55, 0.25, 0.5);
+                            break;
+                        }
+                    }
+                }
+
+                if (selectedCourseIdx === 2 && !puttingState.active) {
+                    for (let s of hole.shapes) {
+                        if ((s.type === 'RIDGE' || s.type === 'MOUNTAIN') &&
+                            ball.x >= s.x && ball.x <= s.x + s.w &&
+                            ball.y >= s.y && ball.y <= s.y + s.h) {
+                            triggerHazardReset(hole, "ROCK HAZARD +1");
+                            return;
+                        }
+                    }
+                }
+
+                if (state === 'FLY') {
+                    ball.vx += Math.cos(sessionConditions.dirAngle) * (sessionConditions.speed * 0.001);
+                    ball.vy += Math.sin(sessionConditions.dirAngle) * (sessionConditions.speed * 0.001);
+                    
+                    ball.z += ball.vz; ball.vz -= GRAVITY;
+                    if (ball.z <= 0) { ball.z = 0; state = 'ROLL'; }
+                } else if (state === 'ROLL') {
+                    if (puttingState.active) {
+                        let activeSlope = getActiveSlope(ball.x, ball.y);
+                        
+                        ball.vx *= sessionConditions.puttingFriction; 
+                        ball.vy *= sessionConditions.puttingFriction;
+                        
+                        let currentSpeed = Math.hypot(ball.vx, ball.vy);
+                        if (currentSpeed > 0.08) {
+                            ball.vx += activeSlope.x;
+                            ball.vy += activeSlope.y;
+                        }
+
+                        let worldX = hole.pin.x + (ball.x - puttingState.cupX) / puttingState.zoomScale;
+                        let worldY = hole.pin.y + (ball.y - puttingState.cupY) / puttingState.zoomScale;
+                        
+                        let terr = getTerrainAt(worldX, worldY);
+                        if (terr !== 'GREEN' && terr !== 'GREEN_DARK') {
+                            exitPuttingOffGreen(worldX, worldY); return;
+                        }
+
+                        let distToCup = Math.hypot(ball.x - puttingState.cupX, ball.y - puttingState.cupY);
+
+                        if (distToCup < puttingState.cupRadius + 1) {
+                            if (currentSpeed < 3.2) {
+                                ball.x = puttingState.cupX; ball.y = puttingState.cupY; ball.vx = 0; ball.vy = 0;
+                                state = 'HOLE_OUT'; playSinkJingle(); 
+                                setTimeout(() => { 
+                                    state = 'POST_HOLE';
+                                }, 2200);
+                                return;
+                            } else {
+                                playSynth('square', 320, 240, 0.08, 0.4);
+                                ball.vx = -ball.vx * 0.35; ball.vy = -ball.vy * 0.35;
+                            }
+                        }
+                        if (currentSpeed < 0.08) {
+                            ball.vx = 0; ball.vy = 0; 
+                            aimAngle = Math.atan2(puttingState.cupY - ball.y, puttingState.cupX - ball.x); 
+                            state = 'AIM';
+                        }
+                    } else {
+                        let curTerr = getTerrainAt(ball.x, ball.y);
+                        let friction = CLUBS[clubIdx].roll;
+                        if (curTerr === 'ROUGH') friction *= 0.75;
+                        if (curTerr === 'SAND') friction *= 0.45;
+                        ball.vx *= friction; ball.vy *= friction;
+
+                        if (Math.abs(ball.vx) < 0.1 && Math.abs(ball.vy) < 0.1) { ball.vx = 0; ball.vy = 0; resolveLie(); }
+                    }
+                }
+            }
+
+            if (!puttingState.active && hole.worldH > 400) camY += (targetCamY - camY) * 0.14;
+            else if (puttingState.active) camY = 0;
+        }
+
+        function resolveLie() {
+            let curTerr = getTerrainAt(ball.x, ball.y); let hole = activeCourseHoles[currentHole];
+            let distToPin = Math.hypot(ball.x - hole.pin.x, ball.y - hole.pin.y);
+
+            if (curTerr === 'WATER' || curTerr === 'OB') {
+                triggerHazardReset(hole, curTerr === 'WATER' ? "WATER +1" : "HAZARD +1");
+            } 
+            else if (distToPin < 8) { 
+                state = 'HOLE_OUT'; playSinkJingle(); 
+                setTimeout(() => { state = 'POST_HOLE'; }, 2200); 
+            } 
+            else if (curTerr === 'GREEN') initPuttingMiniGame(); 
+            else { lie = curTerr; clubIdx = (lie === 'SAND' ? 2 : clubIdx); state = 'AIM'; }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (state === 'TITLE') { drawTitleScreen(); return; }
+            if (state === 'COURSE_SELECT') { drawCourseSelectScreen(); return; }
+            if (state === 'COURSE_SPLASH') { drawCourseSplashScreen(); return; }
+            if (state === 'FINAL_SCORECARD') { drawFinalScorecardScreen(); return; }
+
+            if (puttingState.active) drawPuttingGreenMiniGame();
+            else drawMainCourse();
+
+            drawHUD();
+            if (showMiniMap && state !== 'HOLE_OUT' && state !== 'POST_HOLE') drawOverlayHUD();
+
+            if (state === 'HOLE_OUT' || state === 'POST_HOLE') {
+                let hole = activeCourseHoles[currentHole];
+                ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 150, 600, 100);
+                ctx.fillStyle = PALETTE.GREEN; ctx.textAlign = 'center'; ctx.font = '24px "Press Start 2P"';
+                let diff = strokes - hole.par;
+                let text = (strokes === 1) ? "HOLE IN ONE!" : diff === -2 ? "EAGLE!" : diff === -1 ? "BIRDIE!" : diff === 0 ? "PAR" : diff === 1 ? "BOGEY" : "DBL BOGEY";
+                ctx.fillText(text, 300, 210);
+            }
+        }
+
+        function drawThematicParallaxBackdrop(themeIdx) {
+            const t = Date.now() / 1000;
+
+            if (themeIdx === 2) {
+                ctx.fillStyle = PALETTE.ROUGH_NORTH_DARK;
+                ctx.fillRect(0, 0, 600, 400);
+
+                for (let s = 0; s < 42; s++) {
+                    let sx = ((s * 73 - t * 4) % 600 + 600) % 600;
+                    let sy = (s * 41) % 210 + 10;
+                    ctx.fillStyle = ((Date.now() + s * 170) % 1000 < 550) ? PALETTE.WHITE : PALETTE.MTN_SNOW;
+                    ctx.fillRect(sx, sy, (s % 4 === 0) ? 3 : 2, (s % 4 === 0) ? 3 : 2);
+                }
+
+                let auroraWave = Math.sin(t * 1.1) * 14;
+                for (let ax = -80; ax < 680; ax += 80) {
+                    let shiftY = Math.sin(t * 1.5 + ax * 0.02) * 10;
+                    ctx.fillStyle = 'rgba(82, 242, 178, 0.22)';
+                    ctx.fillRect(ax, 105 + shiftY, 82, 26);
+                    ctx.fillStyle = 'rgba(168, 120, 255, 0.18)';
+                    ctx.fillRect(ax, 131 + shiftY - auroraWave * 0.3, 82, 20);
+                }
+
+                let farOffset = (t * 8) % 200;
+                for (let mx = -200; mx < 800; mx += 200) {
+                    drawSteppedMountainBlock(ctx, mx - farOffset, 155, 185, 145, false);
+                }
+
+                let midOffset = (t * 18) % 150;
+                ctx.save();
+                ctx.scale(2, 2);
+                for (let tx = -75; tx < 375; tx += 75) {
+                    drawTreeToContext(ctx, tx - midOffset * 0.5, 118, 'SNOW_PINE');
+                }
+                ctx.restore();
+
+                ctx.fillStyle = PALETTE.WATER_GLACIAL;
+                ctx.fillRect(0, 294, 600, 106);
+                ctx.fillStyle = 'rgba(82, 242, 178, 0.28)';
+                ctx.fillRect(40 + auroraWave, 302, 520, 14);
+                ctx.fillStyle = PALETTE.WATER_GLACIAL_LIGHT;
+                let waterOffset = (t * 36) % 24;
+                for (let wx = -24; wx < 624; wx += 24) {
+                    ctx.fillRect(wx + waterOffset, 318, 10, 3);
+                    ctx.fillRect(wx - waterOffset + 12, 344, 12, 3);
+                }
+            } else if (themeIdx === 1) {
+                ctx.fillStyle = '#3b3316';
+                ctx.fillRect(0, 0, 600, 165);
+                ctx.fillStyle = '#5c4e22';
+                ctx.fillRect(0, 115, 600, 50);
+
+                let cloudOffset = (t * 12) % 220;
+                ctx.fillStyle = '#d4d0c5';
+                for (let cx = -220; cx < 820; cx += 220) {
+                    let x = cx + cloudOffset;
+                    ctx.fillRect(x, 42, 54, 10);
+                    ctx.fillRect(x + 10, 34, 32, 8);
+                    ctx.fillRect(x + 68, 66, 40, 8);
+                }
+
+                let hillOffset = (t * 10) % 160;
+                ctx.fillStyle = PALETTE.ROUGH_PRAIRIE_DARK;
+                for (let hx = -160; hx < 760; hx += 160) {
+                    ctx.fillRect(hx - hillOffset, 152, 162, 25);
+                    ctx.fillRect(hx + 20 - hillOffset, 144, 110, 10);
+                }
+
+                ctx.fillStyle = PALETTE.ROUGH_PRAIRIE;
+                ctx.fillRect(0, 172, 600, 122);
+                ctx.fillStyle = PALETTE.ROUGH_PRAIRIE_TALL;
+                let grassOffset = (t * 24) % 40;
+                for (let gx = -40; gx < 640; gx += 40) {
+                    ctx.fillRect(gx - grassOffset, 195, 3, 7);
+                    ctx.fillRect(gx + 18 - grassOffset, 235, 3, 7);
+                }
+
+                let herdShift = Math.sin(t * 0.6) * 24;
+                drawPixelBuffalo(105 + herdShift, 264);
+                drawPixelBuffalo(215 + herdShift * 0.8, 254);
+                drawPixelBuffalo(485 - herdShift, 266);
+
+                ctx.fillStyle = PALETTE.WATER_SILT;
+                ctx.fillRect(0, 294, 600, 106);
+                ctx.fillStyle = PALETTE.WATER_SILT_LIGHT;
+                let waterOffset = (t * 32) % 24;
+                for (let wx = -24; wx < 624; wx += 24) {
+                    ctx.fillRect(wx + waterOffset, 308, 10, 4);
+                    ctx.fillRect(wx + waterOffset + 10, 336, 12, 4);
+                }
+            } else {
+                ctx.fillStyle = '#091c14';
+                ctx.fillRect(0, 0, 600, 175);
+                ctx.fillStyle = '#123324';
+                ctx.fillRect(0, 125, 600, 50);
+
+                let cloudOffset = (t * 10) % 240;
+                ctx.fillStyle = 'rgba(212, 208, 197, 0.35)';
+                for (let cx = -240; cx < 840; cx += 240) {
+                    let x = cx + cloudOffset;
+                    ctx.fillRect(x, 44, 52, 8);
+                    ctx.fillRect(x + 12, 38, 28, 6);
+                }
+
+                let farTreeOffset = (t * 9) % 120;
+                ctx.fillStyle = '#0b2419';
+                ctx.fillRect(0, 162, 600, 30);
+                for (let fx = -120; fx < 720; fx += 60) {
+                    let x = fx - farTreeOffset;
+                    ctx.fillRect(x + 12, 142, 16, 22);
+                    ctx.fillRect(x + 16, 134, 8, 10);
+                }
+
+                ctx.fillStyle = PALETTE.ROUGH_WOOD;
+                ctx.fillRect(0, 185, 600, 215);
+                ctx.fillStyle = '#1b402c';
+                let grassOffset = (t * 22) % 36;
+                for (let gx = -36; gx < 636; gx += 36) {
+                    ctx.fillRect(gx - grassOffset, 210, 2, 6);
+                    ctx.fillRect(gx + 16 - grassOffset, 260, 2, 6);
+                    ctx.fillRect(gx + 8 - grassOffset, 315, 2, 6);
+                }
+
+                let nearTreeOffset = (t * 20) % 160;
+                ctx.save();
+                ctx.scale(2, 2);
+                for (let tx = -80; tx < 380; tx += 80) {
+                    drawTreeToContext(ctx, tx - nearTreeOffset * 0.5, 118, (Math.abs(tx) / 80) % 2 === 0 ? 'PINE' : 'BIRCH');
+                }
+                ctx.restore();
+            }
+        }
+
+        function drawPixelGolfBallInGrass(cx, cy) {
+            ctx.fillStyle = PALETTE.FAIRWAY_WOOD;
+            ctx.fillRect(cx - 88, cy + 16, 176, 22);
+            ctx.fillStyle = PALETTE.GREEN_DARK;
+            ctx.fillRect(cx - 72, cy + 12, 144, 14);
+            ctx.fillStyle = PALETTE.GREEN;
+            ctx.fillRect(cx - 56, cy + 10, 112, 8);
+
+            const backBlades = [
+                { dx: -44, h: 16, c: PALETTE.FAIRWAY_WOOD },
+                { dx: -32, h: 20, c: PALETTE.GREEN_DARK },
+                { dx: -20, h: 18, c: PALETTE.FAIRWAY_WOOD },
+                { dx: 18,  h: 19, c: PALETTE.GREEN_DARK },
+                { dx: 30,  h: 17, c: PALETTE.FAIRWAY_WOOD },
+                { dx: 42,  h: 15, c: PALETTE.GREEN_DARK }
+            ];
+            for (let b of backBlades) {
+                ctx.fillStyle = b.c;
+                ctx.fillRect(cx + b.dx, cy + 14 - b.h, 3, b.h);
+            }
+
+            ctx.fillStyle = PALETTE.BLACK;
+            ctx.fillRect(cx - 22, cy + 13, 44, 6);
+            ctx.fillStyle = '#081a12';
+            ctx.fillRect(cx - 26, cy + 15, 52, 4);
+
+            const rows = [
+                { y: -21, w: 14 }, { y: -19, w: 22 }, { y: -17, w: 28 }, { y: -15, w: 32 },
+                { y: -13, w: 36 }, { y: -11, w: 38 }, { y: -9,  w: 40 }, { y: -7,  w: 42 },
+                { y: -5,  w: 42 }, { y: -3,  w: 44 }, { y: -1,  w: 44 }, { y: 1,   w: 44 },
+                { y: 3,   w: 44 }, { y: 5,   w: 42 }, { y: 7,   w: 42 }, { y: 9,   w: 40 },
+                { y: 11,  w: 38 }, { y: 13,  w: 36 }, { y: 15,  w: 32 }, { y: 17,  w: 28 },
+                { y: 19,  w: 22 }, { y: 21,  w: 14 }
+            ];
+
+            ctx.fillStyle = PALETTE.BLACK;
+            for (let row of rows) {
+                ctx.fillRect(cx - row.w / 2 - 2, cy + row.y - 4, row.w + 4, 4);
+            }
+
+            ctx.fillStyle = '#A8B2BA';
+            for (let row of rows) {
+                ctx.fillRect(cx - row.w / 2, cy + row.y - 4, row.w, 4);
+            }
+
+            ctx.fillStyle = PALETTE.SAND;
+            for (let row of rows) {
+                if (row.y < 15) {
+                    let shiftW = Math.max(4, row.w - 4);
+                    ctx.fillRect(cx - row.w / 2 + 1, cy + row.y - 4, shiftW, 3);
+                }
+            }
+
+            ctx.fillStyle = PALETTE.WHITE;
+            for (let row of rows) {
+                if (row.y < 9) {
+                    let brightW = Math.max(4, row.w - 9);
+                    ctx.fillRect(cx - row.w / 2 + 2, cy + row.y - 4, brightW, 3);
+                }
+            }
+
+            const dimples = [
+                { dx: -10, dy: -15, c: '#C4CCD4' }, { dx: -2,  dy: -16, c: '#C4CCD4' }, { dx: 6,   dy: -14, c: '#C4CCD4' },
+                { dx: -14, dy: -9,  c: '#C4CCD4' }, { dx: -6,  dy: -10, c: '#C4CCD4' }, { dx: 2,   dy: -10, c: '#C4CCD4' }, { dx: 10,  dy: -8,  c: '#C4CCD4' },
+                { dx: -16, dy: -3,  c: '#C4CCD4' }, { dx: -8,  dy: -4,  c: '#C4CCD4' }, { dx: 0,   dy: -4,  c: '#C4CCD4' }, { dx: 8,   dy: -2,  c: '#96A0A8' },
+                { dx: -14, dy: 3,   c: '#B4BCC4' }, { dx: -6,  dy: 2,   c: '#B4BCC4' }, { dx: 2,   dy: 3,   c: '#96A0A8' }, { dx: 11,  dy: 4,   c: '#828C94' },
+                { dx: -10, dy: 9,   c: '#828C94' }, { dx: -2,  dy: 9,   c: '#828C94' }, { dx: 6,   dy: 10,  c: '#6E7880' },
+                { dx: -6,  dy: 14,  c: '#6E7880' }, { dx: 2,   dy: 14,  c: '#6E7880' }
+            ];
+            for (let d of dimples) {
+                ctx.fillStyle = d.c;
+                ctx.fillRect(cx + d.dx, cy + d.dy - 2, 3, 2);
+            }
+
+            ctx.fillStyle = PALETTE.WHITE;
+            ctx.fillRect(cx - 12, cy - 15, 5, 3);
+            ctx.fillRect(cx - 14, cy - 12, 3, 4);
+
+            const frontBlades = [
+                { dx: -38, h: 14, c: PALETTE.GREEN },
+                { dx: -28, h: 19, c: PALETTE.FAIRWAY_WOOD },
+                { dx: -24, h: 15, c: PALETTE.GREEN },
+                { dx: -15, h: 13, c: PALETTE.GREEN_DARK },
+                { dx: -12, h: 10, c: PALETTE.GREEN },
+                { dx: -3,  h: 11, c: PALETTE.FAIRWAY_WOOD },
+                { dx: 6,   h: 12, c: PALETTE.GREEN },
+                { dx: 14,  h: 16, c: PALETTE.GREEN_DARK },
+                { dx: 22,  h: 18, c: PALETTE.GREEN },
+                { dx: 31,  h: 14, c: PALETTE.FAIRWAY_WOOD },
+                { dx: 39,  h: 12, c: PALETTE.GREEN }
+            ];
+            for (let f of frontBlades) {
+                ctx.fillStyle = f.c;
+                ctx.fillRect(cx + f.dx, cy + 17 - f.h, 3, f.h);
+                ctx.fillStyle = PALETTE.GREEN;
+                ctx.fillRect(cx + f.dx, cy + 17 - f.h, 2, 3);
+            }
+        }
+
+        function drawTitleScreen() {
+            drawThematicParallaxBackdrop(0);
+
+            const bannerX = 36, bannerY = 36, bannerW = 528, bannerH = 96;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.90)';
+            ctx.fillRect(bannerX, bannerY, bannerW, bannerH);
+            ctx.strokeStyle = PALETTE.UI_ORANGE;
+            ctx.lineWidth = 4;
+            ctx.strokeRect(bannerX, bannerY, bannerW, bannerH);
+            ctx.strokeStyle = PALETTE.YELLOW;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(bannerX + 5, bannerY + 5, bannerW - 10, bannerH - 10);
+
+            drawBlockCourseTitle("SCOTCH PÂKAHATOWÂN", 300, 94, 23);
+
+            drawPixelGolfBallInGrass(300, 232);
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(150, 326, 300, 34);
+            ctx.strokeStyle = PALETTE.WHITE;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(150, 326, 300, 34);
+
+            ctx.fillStyle = PALETTE.YELLOW; 
+            ctx.font = '12px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            if (Date.now() % 1000 < 550) {
+                ctx.fillText("PRESS 'A' TO START", 300, 349);
+            }
+        }
+
+        function drawHoleMiniMapBox(hole, courseIdx, boxX, boxY, boxW, boxH, holeLabel) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.90)';
+            ctx.fillRect(boxX, boxY, boxW, boxH);
+            ctx.strokeStyle = PALETTE.UI_ORANGE;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+            ctx.fillStyle = PALETTE.WHITE;
+            ctx.font = '7px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.fillText(holeLabel, boxX + boxW / 2, boxY + 11);
+
+            const innerX = boxX + 6;
+            const innerY = boxY + 15;
+            const innerW = boxW - 12;
+            const innerH = boxH - 20;
+
+            if (!hole) {
+                ctx.fillStyle = '#1d242b';
+                ctx.fillRect(innerX, innerY, innerW, innerH);
+                ctx.fillStyle = '#555555';
+                ctx.font = '10px "Press Start 2P"';
+                ctx.fillText("?", boxX + boxW / 2, innerY + innerH / 2 + 4);
+                return;
+            }
+
+            if (courseIdx === 1) ctx.fillStyle = PALETTE.ROUGH_PRAIRIE_DARK;
+            else if (courseIdx === 2) ctx.fillStyle = PALETTE.ROUGH_NORTH;
+            else ctx.fillStyle = PALETTE.ROUGH_WOOD;
+            ctx.fillRect(innerX, innerY, innerW, innerH);
+
+            const scaleX = innerW / hole.worldW;
+            const scaleY = innerH / hole.worldH;
+
+            for (let s of hole.shapes) {
+                if (s.type === 'HAZARD_ROCK') continue;
+                if (s.type === 'FAIRWAY') {
+                    ctx.fillStyle = (courseIdx === 1) ? PALETTE.FAIRWAY_PRAIRIE : (courseIdx === 2 ? PALETTE.FAIRWAY_NORTH : PALETTE.FAIRWAY_WOOD);
+                } else if (s.type === 'PEBBLE_ROUGH') {
+                    ctx.fillStyle = PALETTE.PEBBLE_BUFFER;
+                } else if (s.type === 'WATER' || s.type === 'WATERFALL') {
+                    ctx.fillStyle = (courseIdx === 1) ? PALETTE.WATER_SILT : (courseIdx === 2 ? PALETTE.WATER_GLACIAL : PALETTE.WATER_BLUE);
+                } else if (s.type === 'MOUNTAIN' || s.type === 'RIDGE') {
+                    ctx.fillStyle = PALETTE.MTN_HIGH;
+                } else if (s.type === 'SAND') {
+                    ctx.fillStyle = (courseIdx === 2) ? PALETTE.SAND_NORTH : PALETTE.SAND;
+                } else if (s.type === 'GREEN') {
+                    ctx.fillStyle = (courseIdx === 2) ? PALETTE.GREEN_NORTH : PALETTE.GREEN;
+                } else {
+                    ctx.fillStyle = PALETTE[s.type];
+                }
+
+                ctx.fillRect(
+                    innerX + (s.x * scaleX),
+                    innerY + (s.y * scaleY),
+                    Math.max(2, s.w * scaleX),
+                    Math.max(2, s.h * scaleY)
+                );
+            }
+
+            ctx.fillStyle = PALETTE.TEE_BLUE_LIGHT;
+            ctx.fillRect(innerX + (hole.tee.x * scaleX) - 2, innerY + (hole.tee.y * scaleY) - 2, 4, 4);
+
+            ctx.fillStyle = (Date.now() % 400 < 200) ? PALETTE.UI_ORANGE : PALETTE.WHITE;
+            ctx.fillRect(innerX + (hole.pin.x * scaleX) - 2, innerY + (hole.pin.y * scaleY) - 2, 4, 4);
+        }
+
+        function drawGriddedScorecard(scX, scY, scW, scH, holesArr, scoresArr, showLiveColors) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
+            ctx.fillRect(scX, scY, scW, scH);
+            ctx.strokeStyle = PALETTE.UI_ORANGE;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(scX, scY, scW, scH);
+
+            ctx.fillStyle = PALETTE.WHITE;
+            ctx.font = '8px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.fillText("SCORECARD", scX + scW / 2, scY + 12);
+
+            const headerH = 17;
+            const bodyH = scH - headerH;
+            const rowH = bodyH / 3;
+
+            ctx.strokeStyle = '#555555';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(scX, scY + headerH);
+            ctx.lineTo(scX + scW, scY + headerH);
+            ctx.moveTo(scX, scY + headerH + rowH);
+            ctx.lineTo(scX + scW, scY + headerH + rowH);
+            ctx.moveTo(scX, scY + headerH + rowH * 2);
+            ctx.lineTo(scX + scW, scY + headerH + rowH * 2);
+
+            const labelColW = Math.floor(scW * 0.18);
+            const totColW = Math.floor(scW * 0.28);
+            const holeColW = (scW - labelColW - totColW) / 3;
+
+            for (let c = 0; c < 4; c++) {
+                let lx = scX + labelColW + (c * holeColW);
+                ctx.moveTo(lx, scY + headerH);
+                ctx.lineTo(lx, scY + scH);
+            }
+            ctx.stroke();
+
+            ctx.font = '6px "Press Start 2P"';
+            ctx.fillStyle = PALETTE.WHITE;
+            ctx.textAlign = 'left';
+            ctx.fillText("HL", scX + 5, scY + headerH + rowH * 0.72);
+            ctx.fillText("PR", scX + 5, scY + headerH + rowH * 1.72);
+            ctx.fillText("SC", scX + 5, scY + headerH + rowH * 2.72);
+
+            ctx.textAlign = 'center';
+            for (let i = 0; i < 3; i++) {
+                let cx = scX + labelColW + (i * holeColW) + (holeColW / 2);
+                ctx.fillStyle = PALETTE.WHITE;
+                ctx.fillText(i + 1, cx, scY + headerH + rowH * 0.72);
+
+                let parVal = holesArr ? holesArr[i].par : "-";
+                ctx.fillText(parVal, cx, scY + headerH + rowH * 1.72);
+
+                let dispScore = "-";
+                if (scoresArr && (i < currentHole || (i === currentHole && scoresArr[i] > 0))) {
+                    dispScore = scoresArr[i];
+                }
+
+                if (showLiveColors && dispScore !== "-" && holesArr) {
+                    let diff = dispScore - holesArr[i].par;
+                    if (diff < 0) ctx.fillStyle = PALETTE.GREEN;
+                    else if (diff > 0) ctx.fillStyle = PALETTE.RED;
+                    else ctx.fillStyle = PALETTE.WHITE;
+                } else {
+                    ctx.fillStyle = PALETTE.WHITE;
+                }
+                ctx.fillText(dispScore, cx, scY + headerH + rowH * 2.72);
+            }
+
+            let cxTot = scX + scW - (totColW / 2);
+            ctx.fillStyle = PALETTE.WHITE;
+            ctx.fillText("TOT", cxTot, scY + headerH + rowH * 0.72);
+
+            let parTot = holesArr ? holesArr.reduce((a, b) => a + b.par, 0) : "-";
+            ctx.fillText(parTot, cxTot, scY + headerH + rowH * 1.72);
+
+            let totScore = scoresArr ? scoresArr.reduce((a, b) => a + b, 0) : 0;
+            let dispTot = (totScore > 0) ? totScore : "-";
+            ctx.fillText(dispTot, cxTot, scY + headerH + rowH * 2.72);
+        }
+
+        function drawCourseSelectScreen() {
+            const activeCourse = COURSES[selectedCourseIdx];
+
+            if (selectedCourseIdx === 1) ctx.fillStyle = '#262110';
+            else if (selectedCourseIdx === 2) ctx.fillStyle = '#181a33';
+            else ctx.fillStyle = PALETTE.ROUGH_WOOD;
+            ctx.fillRect(0, 0, 600, 400);
+
+            // Top Header Bar
+            ctx.fillStyle = PALETTE.BLACK; ctx.fillRect(0, 0, 600, 28);
+            ctx.fillStyle = PALETTE.UI_ORANGE; ctx.fillRect(0, 28, 600, 4);
+            ctx.fillStyle = PALETTE.WHITE; ctx.font = '13px "Press Start 2P"'; ctx.textAlign = 'center';
+            ctx.fillText("SELECT COURSE", 300, 20);
+
+            // 1. TOP PREVIEW: 3-Hole Mini-Map Strip
+            const miniW = 78, miniH = 84, miniGap = 16;
+            const totalMiniW = (miniW * 3) + (miniGap * 2);
+            const startMiniX = (600 - totalMiniW) / 2;
+            const miniY = 35;
+
+            for (let h = 0; h < 3; h++) {
+                let holeObj = activeCourse.holes ? activeCourse.holes[h] : null;
+                drawHoleMiniMapBox(
+                    holeObj,
+                    selectedCourseIdx,
+                    startMiniX + h * (miniW + miniGap),
+                    miniY,
+                    miniW,
+                    miniH,
+                    `HOLE ${h + 1}`
+                );
+            }
+
+            // 2. MIDDLE: Course Selection Cards (Optimized padding & 6px right spec font so all text fits cleanly inside every card)
+            const startY = 125; const cardH = 49; const cardGap = 5;
+            for (let i = 0; i < COURSES.length; i++) {
+                let y = startY + (i * (cardH + cardGap));
+                let isSel = (i === selectedCourseIdx); 
+                let isAvail = (COURSES[i].status === 'AVAILABLE');
+                
+                ctx.fillStyle = isSel ? 'rgba(0,0,0,0.88)' : 'rgba(0,0,0,0.55)';
+                ctx.fillRect(60, y, 480, cardH);
+                ctx.strokeStyle = isSel ? PALETTE.UI_ORANGE : (isAvail ? '#555555' : '#333333'); 
+                ctx.lineWidth = isSel ? 3 : 1;
+                ctx.strokeRect(60, y, 480, cardH);
+
+                if (isSel) {
+                    ctx.fillStyle = (Date.now() % 400 < 200) ? PALETTE.UI_ORANGE : PALETTE.WHITE;
+                    ctx.font = '12px "Press Start 2P"'; ctx.textAlign = 'left';
+                    ctx.fillText("▶", 72, y + 31);
+                }
+
+                // Dynamic title size for longer course names
+                let nameFontSize = COURSES[i].name.length > 13 ? 10 : 11;
+                ctx.fillStyle = isAvail ? (isSel ? PALETTE.WHITE : '#D4D0C5') : '#666666';
+                ctx.font = `${nameFontSize}px "Press Start 2P"`; ctx.textAlign = 'left';
+                ctx.fillText(COURSES[i].name, 98, y + 20);
+
+                ctx.fillStyle = isAvail ? PALETTE.GREEN : '#883333';
+                ctx.font = '8px "Press Start 2P"';
+                ctx.fillText(COURSES[i].desc, 98, y + 39);
+
+                ctx.fillStyle = isAvail ? PALETTE.YELLOW : '#555555';
+                ctx.font = '6px "Press Start 2P"'; ctx.textAlign = 'right';
+                ctx.fillText(`GREENS:${COURSES[i].greens}`, 528, y + 20);
+                ctx.fillText(`WIND:${COURSES[i].windChance}`, 528, y + 39);
+            }
+
+            // 3. BOTTOM PREVIEW: Blank Gridded Scorecard positioned clearly below the 3rd course card
+            drawGriddedScorecard(180, 290, 240, 76, activeCourse.holes, null, false);
+
+            ctx.fillStyle = PALETTE.WHITE; ctx.font = '9px "Press Start 2P"'; ctx.textAlign = 'center';
+            ctx.fillText("UP/DOWN: SELECT   A: CONFIRM", 300, 386);
+        }
+
+        function drawBlockCourseTitle(text, centerX, baseY, fontSize) {
+            ctx.save();
+            ctx.font = `${fontSize}px "Press Start 2P"`;
+            ctx.textAlign = 'center';
+
+            ctx.fillStyle = PALETTE.BLACK;
+            ctx.fillText(text, centerX + 4, baseY + 4);
+            ctx.fillText(text, centerX + 3, baseY + 3);
+
+            ctx.fillStyle = PALETTE.CANYON;
+            ctx.fillText(text, centerX + 2, baseY + 2);
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, baseY - fontSize - 6, 600, fontSize * 0.56 + 6);
+            ctx.clip();
+            ctx.fillStyle = PALETTE.YELLOW;
+            ctx.fillText(text, centerX, baseY);
+            ctx.restore();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, baseY - fontSize * 0.44, 600, fontSize * 0.6 + 6);
+            ctx.clip();
+            ctx.fillStyle = PALETTE.UI_ORANGE;
+            ctx.fillText(text, centerX, baseY);
+            ctx.restore();
+
+            ctx.restore();
+        }
+
+        function drawAnimatedWindSock(poleX, poleTopY, poleBottomY, windSpeed, windAngle) {
+            ctx.fillStyle = PALETTE.FAIRWAY_WOOD;
+            ctx.fillRect(poleX - 18, poleBottomY - 4, 36, 8);
+            ctx.fillStyle = PALETTE.GREEN;
+            ctx.fillRect(poleX - 14, poleBottomY - 6, 28, 4);
+
+            ctx.fillStyle = '#888888';
+            ctx.fillRect(poleX - 2, poleTopY, 4, poleBottomY - poleTopY);
+            ctx.fillStyle = PALETTE.WHITE;
+            ctx.fillRect(poleX - 1, poleTopY, 2, poleBottomY - poleTopY);
+
+            ctx.fillStyle = PALETTE.YELLOW;
+            ctx.fillRect(poleX - 3, poleTopY - 5, 6, 5);
+
+            const time = Date.now() / 1000;
+            const speedNorm = Math.min(1, windSpeed / 30);
+
+            const dirX = Math.cos(windAngle);
+            const dirY = Math.sin(windAngle);
+
+            const extension = 0.22 + speedNorm * 0.78;
+            const gravitySag = (1 - extension) * 1.15;
+
+            const vecX = dirX * extension;
+            const vecY = (dirY * extension) + gravitySag;
+            const baseAngle = Math.atan2(vecY, vecX);
+
+            const waveSpeed = 3.5 + speedNorm * 10;
+            const waveAmp = 0.04 + speedNorm * 0.14;
+
+            const collarX = poleX + Math.cos(baseAngle) * 7;
+            const collarY = (poleTopY + 4) + Math.sin(baseAngle) * 7;
+
+            ctx.strokeStyle = PALETTE.WHITE;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(poleX, poleTopY + 4);
+            ctx.lineTo(collarX, collarY);
+            ctx.stroke();
+
+            let segX = collarX;
+            let segY = collarY;
+            const segWidths = [11, 11, 10, 10, 9];
+            const segHeights = [14, 12, 10, 8, 6];
+
+            for (let i = 0; i < 5; i++) {
+                let flutter = Math.sin(time * waveSpeed - i * 0.85) * waveAmp;
+                let curAngle = baseAngle + flutter;
+                let w = segWidths[i];
+                let h = segHeights[i];
+
+                ctx.save();
+                ctx.translate(segX, segY);
+                ctx.rotate(curAngle);
+
+                ctx.fillStyle = PALETTE.BLACK;
+                ctx.fillRect(-1, -h / 2 - 1, w + 2, h + 2);
+
+                ctx.fillStyle = (i % 2 === 0) ? PALETTE.UI_ORANGE : PALETTE.WHITE;
+                ctx.fillRect(0, -h / 2, w, h);
+
+                ctx.restore();
+
+                segX += Math.cos(curAngle) * (w - 1);
+                segY += Math.sin(curAngle) * (w - 1);
+            }
+        }
+
+        function drawCourseSplashScreen() {
+            const course = COURSES[selectedCourseIdx];
+
+            drawThematicParallaxBackdrop(selectedCourseIdx);
+
+            const bannerX = 45, bannerY = 26, bannerW = 510, bannerH = 96;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.90)';
+            ctx.fillRect(bannerX, bannerY, bannerW, bannerH);
+            ctx.strokeStyle = PALETTE.UI_ORANGE;
+            ctx.lineWidth = 4;
+            ctx.strokeRect(bannerX, bannerY, bannerW, bannerH);
+            ctx.strokeStyle = PALETTE.YELLOW;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(bannerX + 5, bannerY + 5, bannerW - 10, bannerH - 10);
+
+            const titleFontSize = course.name.length > 12 ? 22 : 26;
+            drawBlockCourseTitle(course.name, 300, 78, titleFontSize);
+
+            ctx.fillStyle = PALETTE.GREEN;
+            ctx.font = '9px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.fillText(`3 HOLES  |  PAR 12  |  GREENS: ${course.greens}`, 300, 108);
+
+            const windPanelX = 140, windPanelY = 138, windPanelW = 320, windPanelH = 184;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(windPanelX, windPanelY, windPanelW, windPanelH);
+            ctx.strokeStyle = PALETTE.UI_ORANGE;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(windPanelX, windPanelY, windPanelW, windPanelH);
+
+            ctx.fillStyle = PALETTE.WHITE;
+            ctx.font = '10px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.fillText("COURSE WIND CONDITIONS", 300, windPanelY + 22);
+
+            drawAnimatedWindSock(300, windPanelY + 72, windPanelY + 144, sessionConditions.speed, sessionConditions.dirAngle);
+
+            ctx.fillStyle = PALETTE.YELLOW;
+            ctx.font = '11px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.fillText(`WIND: ${sessionConditions.speed} KM/H ${sessionConditions.dirName}`, 300, windPanelY + 170);
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(110, 340, 380, 34);
+            ctx.strokeStyle = PALETTE.WHITE;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(110, 340, 380, 34);
+
+            if (Date.now() % 900 < 550) {
+                ctx.fillStyle = PALETTE.YELLOW;
+                ctx.font = '11px "Press Start 2P"';
+                ctx.textAlign = 'center';
+                ctx.fillText("PRESS A BUTTON TO TEE OFF", 300, 362);
+            }
+        }
+
+        function drawFinalScorecardScreen() {
+            drawThematicParallaxBackdrop(selectedCourseIdx);
+
+            const cardX = 40, cardY = 30, cardW = 520, cardH = 340;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.90)'; 
+            ctx.fillRect(cardX, cardY, cardW, cardH);
+            ctx.strokeStyle = PALETTE.UI_ORANGE; 
+            ctx.lineWidth = 4; 
+            ctx.strokeRect(cardX, cardY, cardW, cardH);
+
+            ctx.fillStyle = PALETTE.UI_ORANGE;
+            ctx.font = '16px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.fillText(COURSES[selectedCourseIdx].name, 300, 68);
+
+            ctx.fillStyle = PALETTE.WHITE;
+            ctx.font = '11px "Press Start 2P"';
+            ctx.fillText("FINAL ROUND SCORECARD", 300, 94);
+
+            const tblX = 65, tblY = 120, tblW = 470, rowH = 34;
+            const cols = [95, 80, 80, 80, 135]; 
+
+            ctx.strokeStyle = '#555555';
+            ctx.lineWidth = 2;
+
+            for (let r = 0; r <= 4; r++) {
+                ctx.beginPath();
+                ctx.moveTo(tblX, tblY + (r * rowH));
+                ctx.lineTo(tblX + tblW, tblY + (r * rowH));
+                ctx.stroke();
+            }
+
+            let vLineX = tblX;
+            for (let c = 0; c <= cols.length; c++) {
+                ctx.beginPath();
+                ctx.moveTo(vLineX, tblY);
+                ctx.lineTo(vLineX, tblY + (4 * rowH));
+                ctx.stroke();
+                if (c < cols.length) vLineX += cols[c];
+            }
+
+            ctx.font = '9px "Press Start 2P"';
+            ctx.fillStyle = PALETTE.YELLOW;
+            ctx.textAlign = 'left';
+            ctx.fillText("HOLE", tblX + 16, tblY + 22);
+
+            ctx.textAlign = 'center';
+            for (let i = 0; i < 3; i++) {
+                let cellCenterX = tblX + cols[0] + (i * cols[1]) + (cols[1] / 2);
+                ctx.fillText(i + 1, cellCenterX, tblY + 22);
+            }
+            let totColCenterX = tblX + tblW - (cols[4] / 2);
+            ctx.fillText("TOTAL", totColCenterX, tblY + 22);
+
+            ctx.fillStyle = PALETTE.WHITE;
+            ctx.textAlign = 'left';
+            ctx.fillText("PAR", tblX + 22, tblY + rowH + 22);
+
+            ctx.textAlign = 'center';
+            let parTot = 0;
+            for (let i = 0; i < 3; i++) {
+                let cellCenterX = tblX + cols[0] + (i * cols[1]) + (cols[1] / 2);
+                ctx.fillText(activeCourseHoles[i].par, cellCenterX, tblY + rowH + 22);
+                parTot += activeCourseHoles[i].par;
+            }
+            ctx.fillText(parTot, totColCenterX, tblY + rowH + 22);
+
+            ctx.textAlign = 'left';
+            ctx.fillText("SCORE", tblX + 12, tblY + (rowH * 2) + 22);
+
+            ctx.textAlign = 'center';
+            let totStrokes = 0;
+            for (let i = 0; i < 3; i++) {
+                let cellCenterX = tblX + cols[0] + (i * cols[1]) + (cols[1] / 2);
+                let sc = courseScores[i] || activeCourseHoles[i].par;
+                totStrokes += sc;
+                let diff = sc - activeCourseHoles[i].par;
+                if (diff < 0) ctx.fillStyle = PALETTE.GREEN;
+                else if (diff > 0) ctx.fillStyle = PALETTE.RED;
+                else ctx.fillStyle = PALETTE.WHITE;
+                ctx.fillText(sc, cellCenterX, tblY + (rowH * 2) + 22);
+            }
+            let totDiff = totStrokes - parTot;
+            if (totDiff < 0) ctx.fillStyle = PALETTE.GREEN;
+            else if (totDiff > 0) ctx.fillStyle = PALETTE.RED;
+            else ctx.fillStyle = PALETTE.WHITE;
+            ctx.fillText(totStrokes, totColCenterX, tblY + (rowH * 2) + 22);
+
+            ctx.fillStyle = PALETTE.WHITE;
+            ctx.textAlign = 'left';
+            ctx.fillText("+ / -", tblX + 16, tblY + (rowH * 3) + 22);
+
+            ctx.textAlign = 'center';
+            for (let i = 0; i < 3; i++) {
+                let cellCenterX = tblX + cols[0] + (i * cols[1]) + (cols[1] / 2);
+                let sc = courseScores[i] || activeCourseHoles[i].par;
+                let diff = sc - activeCourseHoles[i].par;
+                let str = diff === 0 ? "E" : (diff > 0 ? `+${diff}` : `${diff}`);
+                if (diff < 0) ctx.fillStyle = PALETTE.GREEN;
+                else if (diff > 0) ctx.fillStyle = PALETTE.RED;
+                else ctx.fillStyle = PALETTE.WHITE;
+                ctx.fillText(str, cellCenterX, tblY + (rowH * 3) + 22);
+            }
+            let totDiffStr = totDiff === 0 ? "EVEN" : (totDiff > 0 ? `+${totDiff}` : `${totDiff}`);
+            if (totDiff < 0) ctx.fillStyle = PALETTE.GREEN;
+            else if (totDiff > 0) ctx.fillStyle = PALETTE.RED;
+            else ctx.fillStyle = PALETTE.WHITE;
+            ctx.fillText(totDiffStr, totColCenterX, tblY + (rowH * 3) + 22);
+
+            ctx.font = '11px "Press Start 2P"';
+            let summaryText = totDiff < 0 ? `OUTSTANDING ROUND: ${Math.abs(totDiff)} UNDER PAR!` :
+                              totDiff === 0 ? "SOLID ROUND: FINISHED EVEN PAR!" :
+                              `ROUND FINISHED: +${totDiff} OVER PAR`;
+            ctx.fillText(summaryText, 300, 288);
+
+            ctx.fillStyle = PALETTE.WHITE;
+            ctx.font = '10px "Press Start 2P"';
+            if (Date.now() % 1000 < 500) {
+                ctx.fillText("PRESS 'A' TO RETURN TO MENU", 300, 335);
+            }
+        }
+
+        function drawPixelBuffalo(bx, by) {
+            ctx.fillStyle = PALETTE.BUFFALO_DARK;
+            ctx.fillRect(bx - 10, by - 6, 20, 12);
+            ctx.fillRect(bx - 12, by - 4, 6, 9);
+            
+            ctx.fillStyle = PALETTE.BUFFALO_BODY;
+            ctx.fillRect(bx - 8, by - 5, 12, 8);
+            
+            ctx.fillStyle = PALETTE.BUFFALO_DARK;
+            ctx.fillRect(bx - 14, by - 2, 6, 7);
+            ctx.fillRect(bx - 15, by + 2, 4, 4);
+            
+            ctx.fillStyle = PALETTE.BUFFALO_HORN;
+            ctx.fillRect(bx - 12, by - 7, 2, 3);
+            ctx.fillRect(bx - 10, by - 6, 2, 2);
+            
+            ctx.fillStyle = PALETTE.BLACK;
+            ctx.fillRect(bx - 8, by + 6, 2, 4);
+            ctx.fillRect(bx - 4, by + 6, 2, 4);
+            ctx.fillRect(bx + 4, by + 6, 2, 4);
+            ctx.fillRect(bx + 7, by + 6, 2, 4);
+        }
+
+        function drawMainCourse() {
+            const hole = activeCourseHoles[currentHole];
+            const isPrairie = (selectedCourseIdx === 1);
+            const isNorthern = (selectedCourseIdx === 2);
+
+            ctx.save(); ctx.translate(0, -Math.floor(camY));
+            ctx.drawImage(offCanvas, 0, 0);
+
+            let waterOffset = (Date.now() / 300) % 20;
+            let auroraPulse = Math.sin(Date.now() / 700) * 16;
+
+            for (let s of hole.shapes) {
+                if (s.type === 'WATER') {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(s.x, s.y, s.w, s.h);
+                    ctx.clip();
+
+                    if (isNorthern) {
+                        ctx.fillStyle = PALETTE.WATER_GLACIAL;
+                        ctx.fillRect(s.x, s.y, s.w, s.h);
+
+                        ctx.fillStyle = 'rgba(82, 242, 178, 0.28)';
+                        ctx.fillRect(s.x, s.y + Math.max(4, s.h * 0.22 + auroraPulse * 0.25), s.w, Math.max(8, s.h * 0.26));
+                        ctx.fillStyle = 'rgba(168, 120, 255, 0.24)';
+                        ctx.fillRect(s.x, s.y + Math.max(8, s.h * 0.52 - auroraPulse * 0.2), s.w, Math.max(6, s.h * 0.20));
+
+                        ctx.fillStyle = PALETTE.WATER_GLACIAL_LIGHT;
+                        for (let wx = s.x - 24; wx < s.x + s.w + 24; wx += 24) {
+                            for (let wy = s.y; wy < s.y + s.h; wy += 14) {
+                                ctx.fillRect(wx + waterOffset, wy + 5, 8, 3);
+                            }
+                        }
+                        ctx.fillStyle = PALETTE.WHITE;
+                        for (let sx = s.x + 14; sx < s.x + s.w - 10; sx += 44) {
+                            for (let sy = s.y + 10; sy < s.y + s.h - 10; sy += 32) {
+                                if (((sx + sy + Math.floor(Date.now() / 450)) % 3) === 0) {
+                                    ctx.fillRect(sx, sy, 2, 2);
+                                }
+                            }
+                        }
+                    } else {
+                        ctx.fillStyle = isPrairie ? PALETTE.WATER_SILT : PALETTE.WATER_BLUE; 
+                        ctx.fillRect(s.x, s.y, s.w, s.h);
+                        
+                        ctx.fillStyle = isPrairie ? PALETTE.WATER_SILT_LIGHT : PALETTE.WATER_BLUE_LIGHT;
+                        for (let wx = s.x - 24; wx < s.x + s.w + 24; wx += 24) {
+                            for (let wy = s.y; wy < s.y + s.h; wy += 12) {
+                                ctx.fillRect(wx + waterOffset, wy + 4, 8, 4);
+                            }
+                        }
+                    }
+                    ctx.restore();
+                } else if (s.type === 'WATERFALL') {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(s.x, s.y, s.w, s.h);
+                    ctx.clip();
+
+                    ctx.fillStyle = PALETTE.WATER_GLACIAL;
+                    ctx.fillRect(s.x, s.y, s.w, s.h);
+
+                    let fallOffset = (Date.now() / 65) % 16;
+                    ctx.fillStyle = PALETTE.WATER_GLACIAL_LIGHT;
+                    for (let fx = s.x + 6; fx < s.x + s.w - 6; fx += 12) {
+                        for (let fy = s.y - 16; fy < s.y + s.h + 16; fy += 16) {
+                            ctx.fillRect(fx, fy + fallOffset, 6, 10);
+                        }
+                    }
+                    ctx.fillStyle = PALETTE.WATER_GLACIAL_FOAM;
+                    for (let fx = s.x + 10; fx < s.x + s.w - 10; fx += 18) {
+                        for (let fy = s.y - 24; fy < s.y + s.h + 24; fy += 24) {
+                            ctx.fillRect(fx, fy + fallOffset * 1.4, 3, 12);
+                        }
+                    }
+                    ctx.fillStyle = PALETTE.WATER_GLACIAL_FOAM;
+                    ctx.fillRect(s.x - 4, s.y + s.h - 14, s.w + 8, 14);
+                    ctx.fillStyle = PALETTE.WHITE;
+                    for (let mx = s.x; mx < s.x + s.w; mx += 10) {
+                        let bob = ((mx + Math.floor(Date.now() / 150)) % 2 === 0) ? -3 : 0;
+                        ctx.fillRect(mx, s.y + s.h - 10 + bob, 6, 6);
+                    }
+                    ctx.restore();
+                }
+            }
+
+            if (isNorthern && currentHole === 0) {
+                for (let s of hole.shapes) {
+                    if (s.type === 'PEBBLE_ROUGH' || s.type === 'FAIRWAY' || s.type === 'GREEN' || s.type === 'SAND') {
+                        drawLandShapeToContext(ctx, s, isPrairie, isNorthern);
+                    }
+                }
+            }
+
+            if (isPrairie && currentHole === 1) {
+                for (let b of buffalos) {
+                    drawPixelBuffalo(b.x, b.y);
+                }
+            }
+
+            ctx.fillStyle = PALETTE.TEE_BLUE; ctx.fillRect(hole.tee.x - 14, hole.tee.y - 4, 8, 8); ctx.fillRect(hole.tee.x + 8,  hole.tee.y - 4, 8, 8);
+            ctx.fillStyle = PALETTE.TEE_BLUE_LIGHT; ctx.fillRect(hole.tee.x - 14, hole.tee.y - 4, 8, 2); ctx.fillRect(hole.tee.x + 8,  hole.tee.y - 4, 8, 2);
+
+            ctx.fillStyle = PALETTE.WHITE; ctx.fillRect(hole.pin.x, hole.pin.y - 30, 4, 30);
+            ctx.fillStyle = PALETTE.UI_ORANGE; let flagWave = (Date.now() % 600 < 300) ? 14 : 16;
+            ctx.fillRect(hole.pin.x + 4, hole.pin.y - 28, flagWave, 10);
+            ctx.fillStyle = PALETTE.BLACK; ctx.fillRect(hole.pin.x - 2, hole.pin.y - 2, 8, 6);
+
+            if (state === 'AIM') {
+                let projDist = CLUBS[clubIdx].dist;
+                let projX = ball.x + Math.cos(aimAngle) * projDist; let projY = ball.y + Math.sin(aimAngle) * projDist;
+                ctx.fillStyle = (Date.now() % 300 < 150) ? PALETTE.WHITE : PALETTE.RED;
+                ctx.fillRect(projX - 1, projY - 4, 2, 8); ctx.fillRect(projX - 4, projY - 1, 8, 2); 
+            }
+
+            if (state === 'FLY' && ball.z > 0) {
+                ctx.fillStyle = 'rgba(0,0,0,0.6)'; let shadowScale = Math.max(2, 6 - (ball.z * 0.05));
+                ctx.fillRect(ball.x - shadowScale/2, ball.y + (ball.z * 0.4) - shadowScale/2, shadowScale, shadowScale);
+            }
+            ctx.fillStyle = PALETTE.WHITE; ctx.fillRect(ball.x - 2, ball.y - ball.z - 2, 5, 5);
+
+            ctx.restore();
+        }
+
+        function drawSlopeArrowHead(x, y, vx, vy) {
+            let angle = Math.atan2(vy, vx);
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.22)'; 
+            ctx.fillRect(-3, -1, 5, 2);
+            ctx.fillRect(0, -2, 2, 4);
+            ctx.fillRect(2, -1, 2, 2);
+            ctx.restore();
+        }
+
+        function drawPuttingGreenMiniGame() {
+            const isPrairie = (selectedCourseIdx === 1);
+            const isNorthern = (selectedCourseIdx === 2);
+
+            if (isNorthern) ctx.fillStyle = PALETTE.ROUGH_NORTH;
+            else if (isPrairie) ctx.fillStyle = PALETTE.ROUGH_PRAIRIE;
+            else ctx.fillStyle = PALETTE.ROUGH_WOOD;
+            ctx.fillRect(0, 32, 600, 312);
+
+            if (isNorthern) {
+                let auroraShift = Math.sin(Date.now() / 800) * 10;
+                ctx.fillStyle = 'rgba(82, 242, 178, 0.12)';
+                ctx.fillRect(0, 70 + auroraShift, 600, 20);
+                ctx.fillStyle = 'rgba(168, 120, 255, 0.10)';
+                ctx.fillRect(0, 275 - auroraShift, 600, 20);
+
+                if (currentHole === 0) {
+                    ctx.fillStyle = PALETTE.WATER_GLACIAL;
+                    ctx.fillRect(0, 32, 600, 312);
+                    ctx.fillStyle = 'rgba(82, 242, 178, 0.26)';
+                    ctx.fillRect(20, 44 + auroraShift * 0.4, 560, 18);
+                    ctx.fillRect(20, 292 - auroraShift * 0.4, 560, 18);
+                    ctx.fillStyle = PALETTE.WATER_GLACIAL_LIGHT;
+                    let waterOffset = (Date.now() / 300) % 24;
+                    for (let wx = 0; wx < 600; wx += 24) {
+                        ctx.fillRect(wx + waterOffset, 44, 8, 3);
+                        ctx.fillRect(wx + waterOffset, 315, 8, 3);
+                    }
+                } else if (currentHole === 1) {
+                    drawSteppedMountainBlock(ctx, 0, 40, 95, 290, true);
+                    ctx.fillStyle = PALETTE.SAND_NORTH; ctx.fillRect(490, 90, 65, 130);
+                    ctx.fillStyle = PALETTE.SAND_NORTH_DARK; ctx.fillRect(500, 100, 45, 110);
+                } else if (currentHole === 2) {
+                    drawSteppedMountainBlock(ctx, 495, 32, 105, 240, false);
+                    ctx.fillStyle = PALETTE.WATER_GLACIAL;
+                    ctx.fillRect(515, 32, 65, 245);
+                    ctx.fillRect(0, 277, 600, 67);
+                    let fallOffset = (Date.now() / 65) % 16;
+                    ctx.fillStyle = PALETTE.WATER_GLACIAL_FOAM;
+                    for (let fy = 32; fy < 270; fy += 16) {
+                        ctx.fillRect(528, fy + fallOffset, 6, 10);
+                        ctx.fillRect(552, fy + fallOffset, 6, 10);
+                    }
+                    ctx.fillStyle = PALETTE.SAND_NORTH; ctx.fillRect(55, 100, 50, 110);
+                    ctx.fillStyle = PALETTE.SAND_NORTH_DARK; ctx.fillRect(65, 110, 32, 90);
+                }
+            } else if (!isPrairie) {
+                if (currentHole === 0 || currentHole === 1) {
+                    ctx.fillStyle = PALETTE.SAND; ctx.fillRect(400, 180, 200, 130);
+                    ctx.fillStyle = PALETTE.SAND_DARK; ctx.fillRect(420, 190, 180, 110);
+                } else if (currentHole === 2) {
+                    ctx.fillStyle = PALETTE.WATER_BLUE; ctx.fillRect(0, 32, 600, 40);
+                    ctx.fillStyle = PALETTE.WATER_BLUE_LIGHT; let waterOffset = (Date.now() / 300) % 20;
+                    for (let wx = 0; wx < 600; wx += 24) { ctx.fillRect(wx + waterOffset, 48, 8, 4); }
+                    
+                    ctx.fillStyle = PALETTE.SAND;
+                    ctx.fillRect(90, 50, 70, 70); ctx.fillRect(440, 50, 70, 70); 
+                    ctx.fillRect(90, 210, 70, 70); ctx.fillRect(440, 210, 70, 70); 
+                    ctx.fillStyle = PALETTE.SAND_DARK;
+                    ctx.fillRect(100, 60, 50, 50); ctx.fillRect(450, 60, 50, 50); 
+                    ctx.fillRect(100, 220, 50, 50); ctx.fillRect(450, 220, 50, 50);
+                }
+            } else {
+                if (currentHole === 0) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(520, 32, 80, 312);
+                    ctx.clip();
+                    ctx.fillStyle = PALETTE.WATER_SILT; ctx.fillRect(520, 32, 80, 312);
+                    ctx.fillStyle = PALETTE.WATER_SILT_LIGHT;
+                    let waterOffset = (Date.now() / 300) % 20;
+                    for (let wx = 496; wx < 624; wx += 24) {
+                        for (let wy = 32; wy < 344; wy += 12) ctx.fillRect(wx + waterOffset, wy + 4, 8, 4);
+                    }
+                    ctx.restore();
+                } else if (currentHole === 2) { 
+                    ctx.fillStyle = PALETTE.SAND; ctx.fillRect(80, 100, 50, 110);
+                    ctx.fillStyle = PALETTE.SAND_DARK; ctx.fillRect(90, 110, 35, 90);
+                }
+            }
+
+            const gX = 130, gY = 55, gW = 340, gH = 210;
+            if (isNorthern) {
+                if (currentHole === 0) {
+                    ctx.fillStyle = PALETTE.PEBBLE_BUFFER;
+                    ctx.fillRect(gX - 20, gY - 20, gW + 40, gH + 40);
+                }
+                ctx.fillStyle = PALETTE.FAIRWAY_NORTH;
+            } else if (isPrairie) {
+                ctx.fillStyle = PALETTE.FAIRWAY_PRAIRIE;
+            } else {
+                ctx.fillStyle = PALETTE.FAIRWAY_WOOD;
+            }
+            ctx.fillRect(gX - 12, gY - 12, gW + 24, gH + 24);
+
+            for (let x = gX; x < gX + gW; x += 20) {
+                for (let y = gY; y < gY + gH; y += 20) {
+                    if (isNorthern) {
+                        ctx.fillStyle = ((x + y) / 20) % 2 === 0 ? PALETTE.GREEN_NORTH : PALETTE.GREEN_NORTH_DARK;
+                    } else {
+                        ctx.fillStyle = ((x + y) / 20) % 2 === 0 ? PALETTE.GREEN : PALETTE.GREEN_DARK;
+                    }
+                    ctx.fillRect(x, y, 20, 20);
+                }
+            }
+
+            for (let sx = gX + 35; sx < gX + gW; sx += 55) {
+                for (let sy = gY + 35; sy < gY + gH; sy += 45) {
+                    let activeSlope = getActiveSlope(sx, sy);
+                    let spd = Math.hypot(activeSlope.x, activeSlope.y);
+                    if (spd > 0.001) {
+                        drawSlopeArrowHead(sx, sy, activeSlope.x, activeSlope.y);
+                    }
+                }
+            }
+
+            ctx.fillStyle = '#08140e'; 
+            ctx.fillRect(puttingState.cupX - puttingState.cupRadius - 1, puttingState.cupY - puttingState.cupRadius - 1, (puttingState.cupRadius * 2) + 2, (puttingState.cupRadius * 2) + 2);
+            ctx.fillStyle = PALETTE.BLACK; 
+            ctx.fillRect(puttingState.cupX - puttingState.cupRadius, puttingState.cupY - puttingState.cupRadius, puttingState.cupRadius * 2, puttingState.cupRadius * 2);
+            ctx.fillStyle = '#1e382b'; 
+            ctx.fillRect(puttingState.cupX - puttingState.cupRadius + 2, puttingState.cupY - puttingState.cupRadius + 2, 4, 4);
+
+            ctx.fillStyle = PALETTE.WHITE; ctx.fillRect(puttingState.cupX - 1, puttingState.cupY - 32, 3, 32);
+            ctx.fillStyle = PALETTE.UI_ORANGE; ctx.fillRect(puttingState.cupX + 2, puttingState.cupY - 32, 12, 10);
+
+            if (state === 'AIM') {
+                const dashDistances = [32, 64, 96]; 
+                let blinkDash = (Date.now() % 300 < 150) ? PALETTE.WHITE : PALETTE.RED;
+                
+                for (let i = 0; i < dashDistances.length; i++) {
+                    let d = dashDistances[i]; 
+                    let dx = ball.x + Math.cos(aimAngle) * d; 
+                    let dy = ball.y + Math.sin(aimAngle) * d;
+                    
+                    ctx.fillStyle = blinkDash; 
+                    ctx.fillRect(dx - 3, dy - 1, 6, 2);
+                    ctx.fillRect(dx - 1, dy - 3, 2, 6);
+                }
+            }
+
+            ctx.fillStyle = PALETTE.WHITE; ctx.fillRect(ball.x - 3, ball.y - 3, 6, 6);
+        }
+
+        function drawOverlayHUD() {
+            const mapX = 12, mapY = 40, mapW = 90, mapH = 130;
+            const hole = activeCourseHoles[currentHole];
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(mapX, mapY, mapW, mapH);
+            ctx.strokeStyle = PALETTE.UI_ORANGE; ctx.lineWidth = 2; ctx.strokeRect(mapX, mapY, mapW, mapH);
+
+            ctx.fillStyle = PALETTE.WHITE; ctx.font = '8px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText("MAP", mapX + mapW / 2, mapY + 12);
+
+            let scaleX = (mapW - 16) / hole.worldW; let scaleY = (mapH - 24) / hole.worldH;
+            for (let s of hole.shapes) {
+                if (s.type === 'HAZARD_ROCK') continue;
+                if (s.type === 'FAIRWAY') {
+                    ctx.fillStyle = (selectedCourseIdx === 1) ? PALETTE.FAIRWAY_PRAIRIE : (selectedCourseIdx === 2 ? PALETTE.FAIRWAY_NORTH : PALETTE.FAIRWAY_WOOD);
+                } else if (s.type === 'PEBBLE_ROUGH') {
+                    ctx.fillStyle = PALETTE.PEBBLE_BUFFER;
+                } else if (s.type === 'WATER' || s.type === 'WATERFALL') {
+                    ctx.fillStyle = (selectedCourseIdx === 1) ? PALETTE.WATER_SILT : (selectedCourseIdx === 2 ? PALETTE.WATER_GLACIAL : PALETTE.WATER_BLUE);
+                } else if (s.type === 'MOUNTAIN' || s.type === 'RIDGE') {
+                    ctx.fillStyle = PALETTE.MTN_HIGH;
+                } else if (s.type === 'SAND') {
+                    ctx.fillStyle = (selectedCourseIdx === 2) ? PALETTE.SAND_NORTH : PALETTE.SAND;
+                } else if (s.type === 'GREEN') {
+                    ctx.fillStyle = (selectedCourseIdx === 2) ? PALETTE.GREEN_NORTH : PALETTE.GREEN;
+                } else {
+                    ctx.fillStyle = PALETTE[s.type];
+                }
+                
+                ctx.fillRect(mapX + 8 + (s.x * scaleX), mapY + 18 + (s.y * scaleY), Math.max(2, s.w * scaleX), Math.max(2, s.h * scaleY));
+            }
+
+            // Pin marker on mini-map
+            ctx.fillStyle = (Date.now() % 400 < 200) ? PALETTE.UI_ORANGE : PALETTE.WHITE; 
+            ctx.fillRect(mapX + 8 + (hole.pin.x * scaleX) - 2, mapY + 18 + (hole.pin.y * scaleY) - 2, 4, 4);
+
+            // Real ball position marker on mini-map
+            ctx.fillStyle = PALETTE.WHITE; 
+            ctx.fillRect(mapX + 8 + (ball.x * scaleX) - 2, mapY + 18 + (ball.y * scaleY) - 2, 4, 4);
+
+            // Blinking Projected Shot Tracker on mini-map when ready to shoot
+            if (state === 'AIM' && !puttingState.active) {
+                let projDist = CLUBS[clubIdx].dist;
+                let projX = Math.max(0, Math.min(hole.worldW, ball.x + Math.cos(aimAngle) * projDist));
+                let projY = Math.max(0, Math.min(hole.worldH, ball.y + Math.sin(aimAngle) * projDist));
+                let mpX = mapX + 8 + (projX * scaleX);
+                let mpY = mapY + 18 + (projY * scaleY);
+
+                ctx.fillStyle = (Date.now() % 300 < 150) ? PALETTE.WHITE : PALETTE.RED;
+                ctx.fillRect(mpX - 1, mpY - 3, 2, 6);
+                ctx.fillRect(mpX - 3, mpY - 1, 6, 2);
+            }
+
+            let viewH = 400; ctx.strokeStyle = PALETTE.YELLOW; ctx.lineWidth = 1; ctx.strokeRect(mapX + 8, mapY + 18 + (camY * scaleY), (mapW - 16), viewH * scaleY);
+
+            let windY = mapY + mapH + 5; let windH = 45;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(mapX, windY, mapW, windH);
+            ctx.strokeStyle = PALETTE.UI_ORANGE; ctx.lineWidth = 2; ctx.strokeRect(mapX, windY, mapW, windH);
+            
+            ctx.fillStyle = PALETTE.WHITE; ctx.font = '8px "Press Start 2P"'; ctx.textAlign = 'center';
+            ctx.fillText("WIND", mapX + mapW / 2, windY + 12);
+            
+            ctx.font = '6px "Press Start 2P"'; ctx.fillStyle = PALETTE.YELLOW;
+            ctx.fillText(`${sessionConditions.speed} KM/H ${sessionConditions.dirName}`, mapX + mapW / 2, windY + 24);
+            
+            ctx.save(); ctx.translate(mapX + mapW / 2, windY + 35); ctx.rotate(sessionConditions.dirAngle);
+            ctx.strokeStyle = PALETTE.WHITE; ctx.lineWidth = 1.5; ctx.beginPath();
+            ctx.moveTo(-4, 0); ctx.lineTo(4, 0); ctx.lineTo(1, -3); ctx.moveTo(4, 0); ctx.lineTo(1, 3); ctx.stroke();
+            ctx.restore();
+
+            let scY = windY + windH + 5;
+            drawGriddedScorecard(mapX, scY, 116, 60, activeCourseHoles, courseScores, true);
+        }
+
+        function drawHUD() {
+            let hole = activeCourseHoles[currentHole];
+
+            ctx.fillStyle = PALETTE.BLACK; ctx.fillRect(0, 0, 600, 32);
+            ctx.fillStyle = PALETTE.UI_ORANGE; ctx.fillRect(0, 32, 600, 4);
+            ctx.fillStyle = PALETTE.BLACK; ctx.fillRect(0, 344, 600, 56);
+            ctx.fillStyle = PALETTE.UI_ORANGE; ctx.fillRect(0, 340, 600, 4);
+
+            ctx.fillStyle = PALETTE.WHITE; ctx.font = '10px "Press Start 2P"'; ctx.textAlign = 'left';
+            let modeLabel = puttingState.active ? `HOLE ${currentHole + 1} (GREEN)` : `HOLE ${currentHole + 1}`;
+            ctx.fillText(`${modeLabel}   PAR ${hole.par}`, 10, 22);
+
+            ctx.textAlign = 'center'; ctx.fillStyle = PALETTE.YELLOW;
+            if (!puttingState.active) ctx.fillText(`WIND: ${sessionConditions.speed}KM/H ${sessionConditions.dirName}`, 300, 22);
+            else ctx.fillText(`GREEN: ${COURSES[selectedCourseIdx].greens}`, 300, 22);
+
+            ctx.fillStyle = PALETTE.WHITE; ctx.textAlign = 'right';
+            let curLie = puttingState.active ? "GREEN" : lie;
+            ctx.fillText(`STROKE: ${strokes + (strokes === 0 ? 1 : 0)}  LIE: ${curLie}`, 590, 22);
+
+            let distText = "";
+            if (puttingState.active) distText = `PIN: ${(Math.hypot(ball.x - puttingState.cupX, ball.y - puttingState.cupY) / puttingState.zoomScale * 3 / 10).toFixed(1)}ft`;
+            else distText = `PIN: ${Math.hypot(ball.x - hole.pin.x, ball.y - hole.pin.y).toFixed(0)}y`;
+
+            ctx.textAlign = 'left';
+            let isBadLie = (lie === 'SAND' || lie === 'ROUGH') && clubIdx === 0 && !puttingState.active;
+            ctx.fillStyle = isBadLie ? PALETTE.CANYON : PALETTE.WHITE;
+            ctx.fillText(`${CLUBS[clubIdx].name}`, 15, 375);
+            ctx.fillStyle = PALETTE.WHITE; ctx.fillText(distText, 215, 375);
+
+            const meterX = 350; const meterW = 230;
+            ctx.fillStyle = '#222222'; ctx.fillRect(meterX, 360, meterW, 20);
+            ctx.fillStyle = '#441111'; ctx.fillRect(meterX, 360, meterW * 0.20, 20);
+            ctx.fillStyle = '#666666'; ctx.fillRect(meterX + (meterW * 0.25), 360, 2, 20); ctx.fillRect(meterX + (meterW * 0.50), 360, 2, 20); ctx.fillRect(meterX + (meterW * 0.75), 360, 2, 20);
+
+            let sweetLeft = meterW * 0.20; let sweetW = meterW * 0.10;
+            ctx.fillStyle = PALETTE.WHITE; ctx.fillRect(meterX + sweetLeft, 360, sweetW, 20);
+            ctx.fillStyle = PALETTE.BLACK; ctx.font = '12px "Press Start 2P"';
+            ctx.fillText("[", meterX + sweetLeft - 4, 375); ctx.fillText("]", meterX + sweetLeft + sweetW - 8, 375);
+
+            if (state === 'POWER' || state === 'SNAP' || state === 'FLY' || state === 'ROLL') {
+                ctx.fillStyle = PALETTE.UI_ORANGE; ctx.fillRect(meterX, 364, (meter.val / 100) * meterW, 12);
+                if (state === 'POWER' || state === 'SNAP') {
+                    ctx.fillStyle = PALETTE.WHITE; ctx.fillRect(meterX + (meter.val / 100) * meterW - 2, 356, 4, 28);
+                }
+            }
+
+            if (meter.powerMarker >= 0) { ctx.fillStyle = PALETTE.UI_ORANGE; ctx.fillRect(meterX + (meter.powerMarker / 100) * meterW - 2, 354, 4, 10); }
+            if (meter.accuracyMarker >= 0) { ctx.fillStyle = PALETTE.WATER_LIGHT; ctx.fillRect(meterX + (meter.accuracyMarker / 100) * meterW - 2, 376, 4, 10); }
+
+            if ((state === 'FLY' || state === 'ROLL' || shotFeedback === "OFF GREEN!" || shotFeedback === "HAZARD +1" || shotFeedback === "WATER +1" || shotFeedback === "ROCK HAZARD +1") && shotFeedback !== "") {
+                ctx.fillStyle = shotFeedback === "GREAT SHOT!" ? PALETTE.YELLOW : shotFeedback === "AVERAGE" ? PALETTE.WHITE : PALETTE.CANYON;
+                ctx.font = '10px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.fillText(shotFeedback, meterX + (meterW / 2), 394);
+            }
+        }
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
