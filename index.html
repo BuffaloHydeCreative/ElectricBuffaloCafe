@@ -145,11 +145,87 @@
       content: "> ";
     }
 
+    /* --- PAUSE HUD OVERLAY --- */
+    #pause-overlay {
+      background: rgba(0, 0, 0, 0.85);
+      color: #12AEA2;
+      padding: 20px;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 12;
+    }
+
+    .pause-box {
+      width: 85%;
+      max-width: 280px;
+      background: #050505;
+      border: 2px solid #12AEA2;
+      box-shadow: 0 0 20px rgba(18, 174, 162, 0.25), inset 0 0 12px rgba(0, 0, 0, 0.9);
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .pause-header {
+      font-weight: bold;
+      font-size: 16px;
+      text-align: center;
+      color: #F7C844;
+      margin-bottom: 14px;
+      border-bottom: 2px dashed #12AEA2;
+      padding-bottom: 6px;
+      letter-spacing: 1px;
+    }
+
+    .pause-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .pause-list li {
+      font-size: 14px;
+      text-transform: uppercase;
+      color: #12AEA2;
+      opacity: 0.65;
+      padding: 4px 6px;
+      cursor: pointer;
+    }
+
+    .pause-list li.active {
+      opacity: 1;
+      font-weight: bold;
+      background: #12AEA2;
+      color: #000;
+    }
+
+    .pause-list li::before {
+      content: "  ";
+      white-space: pre;
+    }
+
+    .pause-list li.active::before {
+      content: "> ";
+    }
+
+    .pause-hint {
+      margin-top: 14px;
+      padding-top: 8px;
+      border-top: 1px dashed #333;
+      font-size: 10px;
+      color: #888;
+      text-align: center;
+    }
+
     #arcade-frame {
       width: 100%;
       height: 100%;
       border: none;
       z-index: 5;
+      pointer-events: none; /* Keeps keyboard focus locked on cabinet OS */
     }
 
     .crt-screen::after {
@@ -327,7 +403,21 @@
             <li>Land Thunder!.html</li>
             <li>Bonami!.html</li>
             <li>Le Grand Portage.html</li>
+            <li>Scotch Pâkahatowân.html</li>
           </ul>
+        </div>
+
+        <!-- PAUSE HUD OVERLAY -->
+        <div id="pause-overlay" class="screen-layer">
+          <div class="pause-box">
+            <div class="pause-header">SYSTEM PAUSED</div>
+            <ul class="pause-list" id="pause-list">
+              <li class="active" data-action="RESUME">Resume</li>
+              <li data-action="RESTART">Game Restart</li>
+              <li data-action="MENU">Return to Game Menu</li>
+            </ul>
+            <div class="pause-hint">D-PAD: SELECT &nbsp;|&nbsp; A (Z): OK</div>
+          </div>
         </div>
 
         <iframe id="arcade-frame" class="screen-layer" title="Game Screen"></iframe>
@@ -341,11 +431,11 @@
       </div>
       <div class="action-container">
         <div class="action-btn-wrapper">
-          <div class="action-btn btn-b" onmousedown="btnAction('BUTTON_B')" ontouchstart="preventGhostClick(event, 'BUTTON_B')"></div>
+          <div class="action-btn btn-b" id="btn-b" onmousedown="btnAction('BUTTON_B')" ontouchstart="preventGhostClick(event, 'BUTTON_B')"></div>
           <span class="btn-label">B</span>
         </div>
         <div class="action-btn-wrapper">
-          <div class="action-btn btn-a" onmousedown="btnAction('BUTTON_A')" ontouchstart="preventGhostClick(event, 'BUTTON_A')"></div>
+          <div class="action-btn btn-a" id="btn-a" onmousedown="btnAction('BUTTON_A')" ontouchstart="preventGhostClick(event, 'BUTTON_A')"></div>
           <span class="btn-label">A</span>
         </div>
       </div>
@@ -360,32 +450,92 @@
   </div>
 
   <script>
-    let machineState = 'BOOT';
+    let machineState = 'BOOT'; // BOOT, STATIC, MENU, PLAYING, PAUSED
     let currentIndex = 0;
+    let pauseIndex = 0;
     const games = [
       'game1.html', 'game2.html', 'game3.html', 
-      'game4.html', 'game5.html', 'game6.html', 'game7.html'
+      'game4.html', 'game5.html', 'game6.html', 'game7.html', 'game8.html'
     ];
     let isPlaying = false;
 
     const bootSplash = document.getElementById('boot-splash');
     const staticSplash = document.getElementById('static-splash');
     const dosMenu = document.getElementById('dos-menu');
+    const pauseOverlay = document.getElementById('pause-overlay');
     const gameFrame = document.getElementById('arcade-frame');
     const listItems = document.querySelectorAll('#game-list li');
+    const pauseItems = document.querySelectorAll('#pause-list li');
+    const btnAEl = document.getElementById('btn-a');
+    const btnBEl = document.getElementById('btn-b');
 
     let staticStartTime = 0;
+
+    /* --- IFRAME PAUSE / FREEZE CONTROLLER --- */
+    let isFramePaused = false;
+    let pausedRAFCallbacks = [];
+
+    function attachFramePauseHook() {
+      try {
+        const win = gameFrame.contentWindow;
+        if (!win || win.__pauseHooked) return;
+        win.__pauseHooked = true;
+
+        const origRAF = win.requestAnimationFrame.bind(win);
+        win.requestAnimationFrame = function(cb) {
+          if (isFramePaused) {
+            pausedRAFCallbacks.push(cb);
+            return -1;
+          }
+          return origRAF(cb);
+        };
+
+        const origSetInterval = win.setInterval.bind(win);
+        win.setInterval = function(fn, delay, ...args) {
+          return origSetInterval(function() {
+            if (!isFramePaused) {
+              if (typeof fn === 'function') fn(...args);
+            }
+          }, delay);
+        };
+      } catch (err) {
+        // Cross-origin fallback relies on postMessage('PAUSE'/'RESUME')
+      }
+    }
+
+    gameFrame.addEventListener('load', () => {
+      isFramePaused = false;
+      pausedRAFCallbacks = [];
+      attachFramePauseHook();
+      window.focus();
+    });
+
+    function setFramePaused(paused) {
+      isFramePaused = paused;
+      sendSignal(paused ? 'PAUSE' : 'RESUME');
+      if (!paused) {
+        try {
+          const win = gameFrame.contentWindow;
+          const cbs = pausedRAFCallbacks.splice(0);
+          cbs.forEach(cb => win.requestAnimationFrame(cb));
+        } catch (err) {}
+      }
+    }
 
     function transitionToStatic() {
       machineState = 'STATIC';
       bootSplash.style.display = 'none';
+      pauseOverlay.style.display = 'none';
+      dosMenu.style.display = 'none';
       staticSplash.style.display = 'flex';
       staticStartTime = performance.now();
       requestAnimationFrame(staticLoop);
     }
 
     function sendSignal(command) {
-      if (isPlaying) gameFrame.contentWindow.postMessage(command, '*');
+      if (isPlaying && machineState === 'PLAYING') {
+        gameFrame.contentWindow.postMessage(command, '*');
+      }
     }
 
     function preventGhostClick(e, actionType) {
@@ -405,6 +555,9 @@
       } else if (machineState === 'MENU') {
         if (directionStr === 'DPAD_UP') moveMenu(-1);
         if (directionStr === 'DPAD_DOWN') moveMenu(1);
+      } else if (machineState === 'PAUSED') {
+        if (directionStr === 'DPAD_UP') movePauseMenu(-1);
+        if (directionStr === 'DPAD_DOWN') movePauseMenu(1);
       }
     }
 
@@ -416,9 +569,80 @@
       listItems[currentIndex].classList.add('active');
     }
 
+    function movePauseMenu(direction) {
+      pauseItems[pauseIndex].classList.remove('active');
+      pauseIndex += direction;
+      if (pauseIndex < 0) pauseIndex = pauseItems.length - 1;
+      if (pauseIndex >= pauseItems.length) pauseIndex = 0;
+      pauseItems[pauseIndex].classList.add('active');
+    }
+
+    function openPauseMenu() {
+      if (machineState !== 'PLAYING') return;
+      stopSendingDirection();
+      machineState = 'PAUSED';
+      pauseItems[pauseIndex].classList.remove('active');
+      pauseIndex = 0;
+      pauseItems[pauseIndex].classList.add('active');
+      setFramePaused(true);
+      pauseOverlay.style.display = 'flex';
+    }
+
+    function resumeGame() {
+      if (machineState !== 'PAUSED') return;
+      pauseOverlay.style.display = 'none';
+      machineState = 'PLAYING';
+      setFramePaused(false);
+    }
+
+    function restartGame() {
+      pauseOverlay.style.display = 'none';
+      isFramePaused = false;
+      pausedRAFCallbacks = [];
+      machineState = 'PLAYING';
+      isPlaying = true;
+      gameFrame.style.display = 'block';
+      gameFrame.src = 'about:blank';
+      setTimeout(() => {
+        gameFrame.src = games[currentIndex];
+      }, 20);
+    }
+
+    function returnToGameMenu() {
+      pauseOverlay.style.display = 'none';
+      isFramePaused = false;
+      pausedRAFCallbacks = [];
+      gameFrame.src = "";
+      gameFrame.style.display = 'none';
+      isPlaying = false;
+      machineState = 'MENU';
+      dosMenu.style.display = 'flex';
+    }
+
+    function executePauseSelection() {
+      const action = pauseItems[pauseIndex].dataset.action;
+      if (action === 'RESUME') resumeGame();
+      else if (action === 'RESTART') restartGame();
+      else if (action === 'MENU') returnToGameMenu();
+    }
+
+    // Allow direct tap/click on Pause HUD options as well
+    pauseItems.forEach((item, idx) => {
+      item.addEventListener('click', () => {
+        if (machineState !== 'PAUSED') return;
+        pauseItems[pauseIndex].classList.remove('active');
+        pauseIndex = idx;
+        pauseItems[pauseIndex].classList.add('active');
+        executePauseSelection();
+      });
+    });
+
     function btnAction(buttonStr) {
       if (machineState === 'PLAYING') {
         sendSignal(buttonStr);
+      } else if (machineState === 'PAUSED') {
+        if (buttonStr === 'BUTTON_A') executePauseSelection();
+        else if (buttonStr === 'BUTTON_B') resumeGame();
       } else if (machineState === 'STATIC' && buttonStr === 'BUTTON_A') {
         machineState = 'MENU';
         staticSplash.style.display = 'none';
@@ -433,7 +657,11 @@
     }
 
     function btnHome() {
-      if (machineState === 'PLAYING' || machineState === 'MENU') {
+      if (machineState === 'PLAYING' || machineState === 'PAUSED' || machineState === 'MENU') {
+        stopSendingDirection();
+        isFramePaused = false;
+        pausedRAFCallbacks = [];
+        pauseOverlay.style.display = 'none';
         gameFrame.src = ""; 
         gameFrame.style.display = 'none';
         dosMenu.style.display = 'none';
@@ -445,6 +673,17 @@
       }
     }
 
+    function handleEscapeKey() {
+      if (machineState === 'PLAYING') {
+        openPauseMenu();
+      } else if (machineState === 'PAUSED') {
+        resumeGame();
+      } else if (machineState === 'MENU') {
+        btnHome();
+      }
+    }
+
+    /* --- JOYSTICK DRAG & KEYBOARD LOGIC --- */
     const joyBase = document.getElementById('joystick-base');
     const joyStick = document.getElementById('joystick-stick');
     let isDragging = false;
@@ -540,6 +779,114 @@
     window.addEventListener('touchmove', moveDrag, { passive: false });
     window.addEventListener('mouseup', endDrag);
     window.addEventListener('touchend', endDrag);
+
+    /* --- KEYBOARD INPUT HANDLERS --- */
+    const activeArrowKeys = new Set();
+    const ARROW_TO_DIR = {
+      ArrowUp: 'DPAD_UP',
+      ArrowDown: 'DPAD_DOWN',
+      ArrowLeft: 'DPAD_LEFT',
+      ArrowRight: 'DPAD_RIGHT'
+    };
+    const DIR_TO_OFFSET = {
+      DPAD_UP: [0, -maxRadius],
+      DPAD_DOWN: [0, maxRadius],
+      DPAD_LEFT: [-maxRadius, 0],
+      DPAD_RIGHT: [maxRadius, 0]
+    };
+
+    function syncKeyboardJoystick() {
+      if (isDragging) return;
+      const keysArray = Array.from(activeArrowKeys);
+      if (keysArray.length === 0) {
+        currentDir = null;
+        stopSendingDirection();
+        joyStick.classList.remove('dragging');
+        joyStick.style.transform = `translate(0px, 0px)`;
+        return;
+      }
+      const latestKey = keysArray[keysArray.length - 1];
+      const newDir = ARROW_TO_DIR[latestKey];
+      const [ox, oy] = DIR_TO_OFFSET[newDir];
+      joyStick.classList.add('dragging');
+      joyStick.style.transform = `translate(${ox}px, ${oy}px)`;
+
+      if (newDir !== currentDir) {
+        currentDir = newDir;
+        startSendingDirection(currentDir);
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const key = e.key;
+      const lower = key.toLowerCase();
+
+      if (ARROW_TO_DIR[key]) {
+        e.preventDefault();
+        if (e.repeat) return;
+        activeArrowKeys.add(key);
+        syncKeyboardJoystick();
+        return;
+      }
+
+      if (lower === 'z') {
+        e.preventDefault();
+        if (e.repeat) return;
+        btnAEl.classList.add('active-press');
+        if (machineState === 'BOOT' && splashState === 'WAITING') {
+          triggerBootStart();
+        } else {
+          btnAction('BUTTON_A');
+        }
+        return;
+      }
+
+      if (lower === 'x') {
+        e.preventDefault();
+        if (e.repeat) return;
+        btnBEl.classList.add('active-press');
+        btnAction('BUTTON_B');
+        return;
+      }
+
+      if (key === 'Escape' || key === 'Esc') {
+        e.preventDefault();
+        if (e.repeat) return;
+        handleEscapeKey();
+        return;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const key = e.key;
+      const lower = key.toLowerCase();
+
+      if (ARROW_TO_DIR[key]) {
+        e.preventDefault();
+        activeArrowKeys.delete(key);
+        syncKeyboardJoystick();
+        return;
+      }
+
+      if (lower === 'z') {
+        e.preventDefault();
+        btnAEl.classList.remove('active-press');
+        return;
+      }
+
+      if (lower === 'x') {
+        e.preventDefault();
+        btnBEl.classList.remove('active-press');
+        return;
+      }
+    });
+
+    window.addEventListener('blur', () => {
+      activeArrowKeys.clear();
+      syncKeyboardJoystick();
+      btnAEl.classList.remove('active-press');
+      btnBEl.classList.remove('active-press');
+    });
 
     function drawMatrix(context, matrix, palette, startX, startY, pixelSize, alpha = 1.0) {
         context.globalAlpha = alpha;
@@ -666,23 +1013,17 @@
     let animStartTime = 0;
     let audioCtx = null;
 
-    window.addEventListener('click', () => {
+    function triggerBootStart() {
         if (machineState === 'BOOT' && splashState === 'WAITING') {
             initAudio();
             playKaChing();
             splashState = 'PLAYING';
             animStartTime = performance.now();
         }
-    });
+    }
 
-    window.addEventListener('touchstart', () => {
-        if (machineState === 'BOOT' && splashState === 'WAITING') {
-            initAudio();
-            playKaChing();
-            splashState = 'PLAYING';
-            animStartTime = performance.now();
-        }
-    }, {passive: true});
+    window.addEventListener('click', triggerBootStart);
+    window.addEventListener('touchstart', triggerBootStart, {passive: true});
 
     function initAudio() {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -735,7 +1076,7 @@
                 ctx.textAlign = 'center';
                 ctx.fillText("POWER ON", canvas.width / 2, canvas.height / 2 - 10);
                 ctx.font = '16px "Courier New"';
-                ctx.fillText("(TAP ANYWHERE TO START)", canvas.width / 2, canvas.height / 2 + 25);
+                ctx.fillText("(TAP OR PRESS Z TO START)", canvas.width / 2, canvas.height / 2 + 25);
             }
         } 
         else if (splashState === 'PLAYING') {
