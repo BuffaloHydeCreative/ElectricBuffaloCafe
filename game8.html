@@ -43,9 +43,6 @@
             if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
         }
 
-        document.addEventListener('touchstart', initAudio, { once: true });
-        document.addEventListener('mousedown', initAudio, { once: true });
-
         function playSynth(type, freqStart, freqEnd, duration, vol) {
             if (!audioCtx) return;
             const osc = audioCtx.createOscillator();
@@ -683,6 +680,7 @@
         }
 
         function handleB_Button() {
+            initAudio();
             if (state === 'COURSE_SELECT') { 
                 state = 'TITLE'; playSynth('triangle', 300, 200, 0.1, 0.3); 
             }
@@ -738,33 +736,66 @@
             playSynth('square', 80, 40, 0.2, 0.8);
         }
 
+        /* --- INDEX.HTML POSTMESSAGE BRIDGE (PULSE-AWARE DPAD + DEBOUNCED BUTTONS) --- */
+        const dpadReleaseTimers = { up: null, down: null, left: null, right: null };
+        const DPAD_PULSE_HOLD_MS = 125; // Matches index.html 100ms repeat cadence without sticky latch
+        let lastBtnATime = 0;
+        let lastBtnBTime = 0;
+        const BUTTON_DEBOUNCE_MS = 120;
+
+        function triggerDpadPulse(dir) {
+            if (dir === 'up') dpad.down = false;
+            else if (dir === 'down') dpad.up = false;
+            else if (dir === 'left') dpad.right = false;
+            else if (dir === 'right') dpad.left = false;
+
+            dpad[dir] = true;
+            if (dpadReleaseTimers[dir]) clearTimeout(dpadReleaseTimers[dir]);
+            dpadReleaseTimers[dir] = setTimeout(() => {
+                dpad[dir] = false;
+                dpadReleaseTimers[dir] = null;
+            }, DPAD_PULSE_HOLD_MS);
+        }
+
+        function clearAllDpad() {
+            for (const dir of ['up', 'down', 'left', 'right']) {
+                dpad[dir] = false;
+                if (dpadReleaseTimers[dir]) {
+                    clearTimeout(dpadReleaseTimers[dir]);
+                    dpadReleaseTimers[dir] = null;
+                }
+            }
+        }
+
         window.addEventListener('message', function(event) {
             const cmd = event.data;
-            if (cmd === 'DPAD_UP_PRESS' || cmd === 'DPAD_UP') dpad.up = true;
-            if (cmd === 'DPAD_UP_RELEASE') dpad.up = false;
-            if (cmd === 'DPAD_DOWN_PRESS' || cmd === 'DPAD_DOWN') dpad.down = true;
-            if (cmd === 'DPAD_DOWN_RELEASE') dpad.down = false;
-            if (cmd === 'DPAD_LEFT_PRESS' || cmd === 'DPAD_LEFT') dpad.left = true;
-            if (cmd === 'DPAD_LEFT_RELEASE') dpad.left = false;
-            if (cmd === 'DPAD_RIGHT_PRESS' || cmd === 'DPAD_RIGHT') dpad.right = true;
-            if (cmd === 'DPAD_RIGHT_RELEASE') dpad.right = false;
-            if (cmd === 'BUTTON_A') handleA_Button();
-            if (cmd === 'BUTTON_B') handleB_Button();
-        });
+            if (typeof cmd !== 'string') return;
 
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowUp') dpad.up = true;
-            if (e.key === 'ArrowDown') dpad.down = true;
-            if (e.key === 'ArrowLeft') dpad.left = true;
-            if (e.key === 'ArrowRight') dpad.right = true;
-            if (e.key === 'a' || e.key === 'A' || e.key === ' ') handleA_Button();
-            if (e.key === 'b' || e.key === 'B' || e.key === 'm' || e.key === 'M') handleB_Button();
-        });
-        window.addEventListener('keyup', (e) => {
-            if (e.key === 'ArrowUp') dpad.up = false;
-            if (e.key === 'ArrowDown') dpad.down = false;
-            if (e.key === 'ArrowLeft') dpad.left = false;
-            if (e.key === 'ArrowRight') dpad.right = false;
+            if (cmd === 'DPAD_UP' || cmd === 'DPAD_UP_PRESS') triggerDpadPulse('up');
+            else if (cmd === 'DPAD_UP_RELEASE') { dpad.up = false; clearTimeout(dpadReleaseTimers.up); }
+            else if (cmd === 'DPAD_DOWN' || cmd === 'DPAD_DOWN_PRESS') triggerDpadPulse('down');
+            else if (cmd === 'DPAD_DOWN_RELEASE') { dpad.down = false; clearTimeout(dpadReleaseTimers.down); }
+            else if (cmd === 'DPAD_LEFT' || cmd === 'DPAD_LEFT_PRESS') triggerDpadPulse('left');
+            else if (cmd === 'DPAD_LEFT_RELEASE') { dpad.left = false; clearTimeout(dpadReleaseTimers.left); }
+            else if (cmd === 'DPAD_RIGHT' || cmd === 'DPAD_RIGHT_PRESS') triggerDpadPulse('right');
+            else if (cmd === 'DPAD_RIGHT_RELEASE') { dpad.right = false; clearTimeout(dpadReleaseTimers.right); }
+            else if (cmd === 'BUTTON_A') {
+                const now = performance.now();
+                if (now - lastBtnATime >= BUTTON_DEBOUNCE_MS) {
+                    lastBtnATime = now;
+                    handleA_Button();
+                }
+            }
+            else if (cmd === 'BUTTON_B') {
+                const now = performance.now();
+                if (now - lastBtnBTime >= BUTTON_DEBOUNCE_MS) {
+                    lastBtnBTime = now;
+                    handleB_Button();
+                }
+            }
+            else if (cmd === 'PAUSE' || cmd === 'RESUME') {
+                clearAllDpad();
+            }
         });
 
         function handleMenuNavigation(key, changeVal) {
@@ -1490,7 +1521,7 @@
                 );
             }
 
-            // 2. MIDDLE: Course Selection Cards (Optimized padding & 6px right spec font so all text fits cleanly inside every card)
+            // 2. MIDDLE: Course Selection Cards
             const startY = 125; const cardH = 49; const cardGap = 5;
             for (let i = 0; i < COURSES.length; i++) {
                 let y = startY + (i * (cardH + cardGap));
@@ -1509,7 +1540,6 @@
                     ctx.fillText("▶", 72, y + 31);
                 }
 
-                // Dynamic title size for longer course names
                 let nameFontSize = COURSES[i].name.length > 13 ? 10 : 11;
                 ctx.fillStyle = isAvail ? (isSel ? PALETTE.WHITE : '#D4D0C5') : '#666666';
                 ctx.font = `${nameFontSize}px "Press Start 2P"`; ctx.textAlign = 'left';
@@ -1525,7 +1555,7 @@
                 ctx.fillText(`WIND:${COURSES[i].windChance}`, 528, y + 39);
             }
 
-            // 3. BOTTOM PREVIEW: Blank Gridded Scorecard positioned clearly below the 3rd course card
+            // 3. BOTTOM PREVIEW: Blank Gridded Scorecard
             drawGriddedScorecard(180, 290, 240, 76, activeCourse.holes, null, false);
 
             ctx.fillStyle = PALETTE.WHITE; ctx.font = '9px "Press Start 2P"'; ctx.textAlign = 'center';
@@ -2233,7 +2263,7 @@
             }
 
             if (meter.powerMarker >= 0) { ctx.fillStyle = PALETTE.UI_ORANGE; ctx.fillRect(meterX + (meter.powerMarker / 100) * meterW - 2, 354, 4, 10); }
-            if (meter.accuracyMarker >= 0) { ctx.fillStyle = PALETTE.WATER_LIGHT; ctx.fillRect(meterX + (meter.accuracyMarker / 100) * meterW - 2, 376, 4, 10); }
+            if (meter.accuracyMarker >= 0) { ctx.fillStyle = PALETTE.WATER_BLUE_LIGHT; ctx.fillRect(meterX + (meter.accuracyMarker / 100) * meterW - 2, 376, 4, 10); }
 
             if ((state === 'FLY' || state === 'ROLL' || shotFeedback === "OFF GREEN!" || shotFeedback === "HAZARD +1" || shotFeedback === "WATER +1" || shotFeedback === "ROCK HAZARD +1") && shotFeedback !== "") {
                 ctx.fillStyle = shotFeedback === "GREAT SHOT!" ? PALETTE.YELLOW : shotFeedback === "AVERAGE" ? PALETTE.WHITE : PALETTE.CANYON;
